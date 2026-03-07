@@ -1,0 +1,312 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== ENUMS ====================
+
+enum UserStatus {
+  ACTIVE
+  BLOCKED
+  PENDING // Ещё не активировал бота
+}
+
+enum ChatType {
+  GROUP
+  SUPERGROUP
+  CHANNEL
+}
+
+enum ChatMembershipStatus {
+  ACTIVE
+  PENDING_INVITE // Ожидает вступления по ссылке
+  KICKED
+  LEFT
+}
+
+enum BroadcastStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  FAILED
+}
+
+enum BroadcastTargetType {
+  CHAT      // Конкретный чат/канал
+  TAG       // Список интересов (в личку)
+  ALL_USERS // Глобальная рассылка
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  VIEWER
+}
+
+// ==================== MODELS ====================
+
+/// Администраторы панели
+model Admin {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  password  String    // bcrypt hash
+  name      String
+  role      AdminRole @default(ADMIN)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Relations
+  broadcasts Broadcast[] @relation("CreatedBy")
+
+  @@map("admins")
+}
+
+/// Сотрудники компании
+model User {
+  id          String     @id @default(cuid())
+  telegramId  BigInt     @unique // Telegram user ID (основной идентификатор)
+  username    String?    // @username (может меняться)
+  phone       String?    // Телефон
+  firstName   String?
+  lastName    String?
+  department  String?    // Отдел
+  position    String?    // Должность
+  status      UserStatus @default(PENDING)
+  botStarted  Boolean    @default(false) // Нажал ли /start
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  blockedAt   DateTime?  // Дата увольнения/блокировки
+
+  // Relations
+  tags              UserTag[]
+  chatMemberships   ChatMembership[]
+  inviteLinks       InviteLink[]
+  broadcastRecipients BroadcastRecipient[]
+
+  @@index([username])
+  @@index([phone])
+  @@index([status])
+  @@map("users")
+}
+
+/// Теги / Списки интересов
+model Tag {
+  id          String   @id @default(cuid())
+  name        String   @unique // "IT-отдел", "Падел", "Ricci Future Lab"
+  description String?
+  color       String?  // Цвет для UI (#FF5733)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  users      UserTag[]
+  broadcasts BroadcastTag[]
+
+  @@map("tags")
+}
+
+/// Связь пользователей и тегов (many-to-many)
+model UserTag {
+  id        String   @id @default(cuid())
+  userId    String
+  tagId     String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tagId])
+  @@map("user_tags")
+}
+
+/// Корпоративные чаты и каналы
+model Chat {
+  id         String   @id @default(cuid())
+  telegramId BigInt   @unique // Telegram chat ID
+  title      String
+  type       ChatType
+  
+  // Права бота
+  botIsAdmin Boolean @default(false)
+  canPost    Boolean @default(false)
+  canInvite  Boolean @default(false)
+  canBan     Boolean @default(false)
+  canPin     Boolean @default(false)
+  
+  // Мета
+  isActive   Boolean  @default(true) // Активен ли чат в системе
+  inviteLink String?  // Постоянная ссылка-приглашение
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  memberships      ChatMembership[]
+  packageItems     ChatPackageItem[]
+  inviteLinks      InviteLink[]
+  broadcastTargets BroadcastChat[]
+
+  @@index([telegramId])
+  @@map("chats")
+}
+
+/// Пакеты чатов для onboarding
+model ChatPackage {
+  id          String   @id @default(cuid())
+  name        String   @unique // "Базовый пакет", "IT-пакет"
+  description String?
+  isDefault   Boolean  @default(false) // Автоматически назначать новым
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  items ChatPackageItem[]
+
+  @@map("chat_packages")
+}
+
+/// Связь пакетов и чатов
+model ChatPackageItem {
+  id        String @id @default(cuid())
+  packageId String
+  chatId    String
+
+  package ChatPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  chat    Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@unique([packageId, chatId])
+  @@map("chat_package_items")
+}
+
+/// Членство пользователей в чатах
+model ChatMembership {
+  id        String               @id @default(cuid())
+  userId    String
+  chatId    String
+  status    ChatMembershipStatus @default(PENDING_INVITE)
+  joinedAt  DateTime?
+  leftAt    DateTime?
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, chatId])
+  @@index([status])
+  @@map("chat_memberships")
+}
+
+/// Временные инвайт-ссылки
+model InviteLink {
+  id          String    @id @default(cuid())
+  userId      String
+  chatId      String
+  link        String    // https://t.me/+xxxxx
+  expiresAt   DateTime
+  usedAt      DateTime?
+  usedByTgId  BigInt?   // Кто реально вступил (для проверки)
+  createdAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([link])
+  @@index([expiresAt])
+  @@map("invite_links")
+}
+
+/// Рассылки
+model Broadcast {
+  id          String              @id @default(cuid())
+  title       String?             // Название для админки
+  content     String              // Текст сообщения
+  mediaUrl    String?             // URL картинки/видео
+  mediaType   String?             // image, video, document, audio
+  buttons     Json?               // Inline кнопки [{text, url}]
+  
+  targetType  BroadcastTargetType
+  status      BroadcastStatus     @default(DRAFT)
+  
+  scheduledAt DateTime?           // Время отложенной отправки
+  sentAt      DateTime?
+  
+  createdById String
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  // Relations
+  createdBy  Admin               @relation("CreatedBy", fields: [createdById], references: [id])
+  targetTags BroadcastTag[]
+  targetChats BroadcastChat[]
+  recipients BroadcastRecipient[]
+
+  @@index([status])
+  @@index([scheduledAt])
+  @@map("broadcasts")
+}
+
+/// Целевые теги рассылки
+model BroadcastTag {
+  id          String @id @default(cuid())
+  broadcastId String
+  tagId       String
+
+  broadcast Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  tag       Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([broadcastId, tagId])
+  @@map("broadcast_tags")
+}
+
+/// Целевые чаты рассылки
+model BroadcastChat {
+  id          String @id @default(cuid())
+  broadcastId String
+  chatId      String
+
+  broadcast Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  chat      Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@unique([broadcastId, chatId])
+  @@map("broadcast_chats")
+}
+
+/// Получатели рассылки (для трекинга)
+model BroadcastRecipient {
+  id          String    @id @default(cuid())
+  broadcastId String
+  userId      String
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  error       String?
+  
+  broadcast Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([broadcastId, userId])
+  @@map("broadcast_recipients")
+}
+
+/// Логи API запросов (для внешних интеграций)
+model ApiLog {
+  id        String   @id @default(cuid())
+  endpoint  String
+  method    String
+  payload   Json?
+  response  Json?
+  status    Int
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([endpoint])
+  @@index([createdAt])
+  @@map("api_logs")
+}
