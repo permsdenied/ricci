@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 
+import prisma from "./db/client";
 import { errorMiddleware } from "./common/middlewares/error";
 import { requestLoggerMiddleware } from "./common/middlewares/request-logger";
 import { notFoundMiddleware } from "./common/middlewares/not-found";
@@ -29,12 +30,22 @@ app.use(requestLoggerMiddleware);
 // Static: serve uploaded files
 app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
 
-// Health check
-app.get("/api/health", (req, res) => {
-  res.status(200).json({
-    status: "ok",
-    timestamp: new Date().toISOString(),
-  });
+// Health check (with DB connectivity)
+app.get("/api/health", async (_req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.status(200).json({
+      status: "ok",
+      db: "connected",
+      timestamp: new Date().toISOString(),
+    });
+  } catch {
+    res.status(503).json({
+      status: "error",
+      db: "disconnected",
+      timestamp: new Date().toISOString(),
+    });
+  }
 });
 
 // API Routes
