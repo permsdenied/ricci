@@ -34,6 +34,9 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Eye,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 
 // в”Ђв”Ђ Types в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
@@ -63,6 +66,23 @@ interface Broadcast {
   targetChats: Array<{ id: string; title: string }>;
   recipientsCount: number;
   createdBy: { name: string };
+}
+
+interface BroadcastRecipient {
+  id: string;
+  sentAt: string | null;
+  error: string | null;
+  user: {
+    id: string;
+    telegramId: string;
+    firstName: string | null;
+    lastName: string | null;
+    username: string | null;
+  };
+}
+
+interface BroadcastDetail extends Broadcast {
+  recipients: BroadcastRecipient[];
 }
 
 interface Tag {
@@ -139,8 +159,11 @@ async function uploadFile(file: File): Promise<string> {
   const res = await api.post("/uploads", formData, {
     headers: { "Content-Type": "multipart/form-data" },
   });
-  // Build absolute URL using current API base (strip /api path)
-  const base = (import.meta.env.VITE_API_URL ?? "http://localhost:3000/api").replace(/\/api$/, "");
+  // If VITE_API_URL is a relative path (e.g. /api in production), use window.location.origin
+  const apiUrl = import.meta.env.VITE_API_URL ?? "";
+  const base = apiUrl.startsWith("http")
+    ? apiUrl.replace(/\/api$/, "")
+    : window.location.origin;
   return base + res.data.data.url;
 }
 
@@ -416,6 +439,11 @@ function BroadcastsPage() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [chats, setChats] = useState<Chat[]>([]);
 
+  // Detail dialog
+  const [detailBroadcast, setDetailBroadcast] = useState<BroadcastDetail | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+
   // в”Ђв”Ђ Fetch в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
   const fetchBroadcasts = useCallback(
@@ -545,6 +573,21 @@ function BroadcastsPage() {
       fetchBroadcasts(page, statusFilter);
     } catch (err: any) {
       toast.error(err.response?.data?.error?.message || "Ошибка отправки");
+    }
+  };
+
+  const handleOpenDetail = async (id: string) => {
+    setIsDetailOpen(true);
+    setDetailLoading(true);
+    setDetailBroadcast(null);
+    try {
+      const res = await api.get(`/broadcasts/${id}`);
+      setDetailBroadcast(res.data.data);
+    } catch {
+      toast.error("Ошибка загрузки деталей");
+      setIsDetailOpen(false);
+    } finally {
+      setDetailLoading(false);
     }
   };
 
@@ -931,6 +974,14 @@ function BroadcastsPage() {
                       Отправить
                     </Button>
                   )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleOpenDetail(b.id)}
+                  >
+                    <Eye className="h-3.5 w-3.5 mr-1" />
+                    Детали
+                  </Button>
                   {b.status !== "SENDING" && (
                     <Button
                       size="sm"
@@ -947,6 +998,137 @@ function BroadcastsPage() {
           ))}
         </div>
       )}
+
+      {/* Detail dialog */}
+      <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {detailBroadcast?.title || "Детали рассылки"}
+            </DialogTitle>
+          </DialogHeader>
+
+          {detailLoading ? (
+            <div className="flex items-center justify-center py-12 text-muted-foreground">
+              Загрузка...
+            </div>
+          ) : detailBroadcast ? (
+            <div className="space-y-4">
+              {/* Meta */}
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Статус</p>
+                  <Badge variant={STATUS_VARIANTS[detailBroadcast.status]}>
+                    {STATUS_LABELS[detailBroadcast.status]}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Тип</p>
+                  <TargetBadge broadcast={detailBroadcast} />
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Создано</p>
+                  <p>{formatDate(detailBroadcast.createdAt)}</p>
+                </div>
+                {detailBroadcast.sentAt && (
+                  <div>
+                    <p className="text-muted-foreground">Отправлено</p>
+                    <p>{formatDate(detailBroadcast.sentAt)}</p>
+                  </div>
+                )}
+                {detailBroadcast.scheduledAt && detailBroadcast.status === "SCHEDULED" && (
+                  <div>
+                    <p className="text-muted-foreground">Запланировано на</p>
+                    <p>{formatDate(detailBroadcast.scheduledAt)}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-muted-foreground">Автор</p>
+                  <p>{detailBroadcast.createdBy?.name || "—"}</p>
+                </div>
+              </div>
+
+              {/* Content preview */}
+              <div>
+                <p className="text-sm font-medium mb-2">Текст сообщения</p>
+                <div className="border rounded-md p-3 bg-muted/30 text-sm whitespace-pre-wrap max-h-32 overflow-y-auto">
+                  {detailBroadcast.content}
+                </div>
+              </div>
+
+              {/* Recipients */}
+              {detailBroadcast.targetType !== "CHAT" && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-medium">
+                      Получатели
+                    </p>
+                    <span className="text-xs text-muted-foreground">
+                      {detailBroadcast.recipientsCount} всего
+                      {detailBroadcast.recipients.length < detailBroadcast.recipientsCount &&
+                        ` · показано ${detailBroadcast.recipients.length}`}
+                    </span>
+                  </div>
+                  {detailBroadcast.recipients.length === 0 ? (
+                    <p className="text-sm text-muted-foreground border rounded-md p-3 text-center">
+                      Нет данных о получателях
+                    </p>
+                  ) : (
+                    <div className="border rounded-md divide-y max-h-64 overflow-y-auto">
+                      {detailBroadcast.recipients.map((r) => (
+                        <div key={r.id} className="flex items-center gap-3 px-3 py-2">
+                          {r.error ? (
+                            <XCircle className="h-4 w-4 text-destructive shrink-0" />
+                          ) : r.sentAt ? (
+                            <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                          ) : (
+                            <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">
+                              {r.user.firstName} {r.user.lastName}
+                              {(!r.user.firstName && !r.user.lastName) && `ID: ${r.user.telegramId}`}
+                            </p>
+                            {r.user.username && (
+                              <p className="text-xs text-muted-foreground">@{r.user.username}</p>
+                            )}
+                          </div>
+                          <div className="text-right shrink-0">
+                            {r.error ? (
+                              <p className="text-xs text-destructive max-w-[140px] truncate" title={r.error}>
+                                {r.error}
+                              </p>
+                            ) : r.sentAt ? (
+                              <p className="text-xs text-muted-foreground">{formatDate(r.sentAt)}</p>
+                            ) : (
+                              <p className="text-xs text-muted-foreground">Ожидает</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {detailBroadcast.targetType === "CHAT" && (
+                <div>
+                  <p className="text-sm font-medium mb-2">Целевые чаты</p>
+                  <div className="flex flex-wrap gap-2">
+                    {detailBroadcast.targetChats.map((c) => (
+                      <Badge key={c.id} variant="outline">{c.title}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDetailOpen(false)}>Закрыть</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Pagination */}
       {totalPages > 1 && (

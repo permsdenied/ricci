@@ -29,7 +29,19 @@ import {
 import { Label } from "@/components/ui/label";
 import api from "@/api/axios";
 import { toast } from "sonner";
-import { Plus, Search, UserX, UserCheck, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, UserX, UserCheck, Edit, Trash2, Download } from "lucide-react";
+
+interface Tag {
+  id: string;
+  name: string;
+  color: string;
+}
+
+interface ChatPackage {
+  id: string;
+  name: string;
+  isDefault: boolean;
+}
 
 interface User {
   id: string;
@@ -58,6 +70,11 @@ function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [searchField, setSearchField] = useState<"all" | "name" | "username" | "phone">("username");
+  const [tagFilter, setTagFilter] = useState<string>("all");
+
+  // Reference data
+  const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [allPackages, setAllPackages] = useState<ChatPackage[]>([]);
 
   // Создание
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -68,6 +85,9 @@ function UsersPage() {
     lastName: "",
     department: "",
     position: "",
+    phone: "",
+    chatPackageId: "",
+    tagIds: [] as string[],
   });
 
   // Редактирование
@@ -83,8 +103,28 @@ function UsersPage() {
   });
 
   useEffect(() => {
+    fetchRefData();
     fetchUsers();
   }, []);
+
+  const fetchRefData = async () => {
+    try {
+      const [tagsRes, pkgsRes] = await Promise.all([
+        api.get("/tags"),
+        api.get("/chat-packages"),
+      ]);
+      setAllTags(tagsRes.data.data);
+      setAllPackages(pkgsRes.data.data);
+
+      // Pre-select default package
+      const defaultPkg = pkgsRes.data.data.find((p: ChatPackage) => p.isDefault);
+      if (defaultPkg) {
+        setNewUser((prev) => ({ ...prev, chatPackageId: defaultPkg.id }));
+      }
+    } catch (err) {
+      console.error("Failed to fetch reference data:", err);
+    }
+  };
 
   const fetchUsers = async (page = 1) => {
     try {
@@ -96,6 +136,7 @@ function UsersPage() {
         params.append("search", search);
         if (searchField !== "all") params.append("searchField", searchField);
       }
+      if (tagFilter !== "all") params.append("tagId", tagFilter);
 
       const response = await api.get(`/users?${params}`);
       setUsers(response.data.data);
@@ -108,9 +149,18 @@ function UsersPage() {
     }
   };
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     fetchUsers();
+  };
+
+  const toggleNewUserTag = (tagId: string) => {
+    setNewUser((prev) => ({
+      ...prev,
+      tagIds: prev.tagIds.includes(tagId)
+        ? prev.tagIds.filter((id) => id !== tagId)
+        : [...prev.tagIds, tagId],
+    }));
   };
 
   const handleCreateUser = async () => {
@@ -122,6 +172,9 @@ function UsersPage() {
         lastName: newUser.lastName || undefined,
         department: newUser.department || undefined,
         position: newUser.position || undefined,
+        phone: newUser.phone || undefined,
+        tagIds: newUser.tagIds.length > 0 ? newUser.tagIds : undefined,
+        chatPackageId: newUser.chatPackageId || undefined,
       });
       toast.success("Сотрудник создан");
       setIsCreateOpen(false);
@@ -132,6 +185,9 @@ function UsersPage() {
         lastName: "",
         department: "",
         position: "",
+        phone: "",
+        chatPackageId: allPackages.find((p) => p.isDefault)?.id || "",
+        tagIds: [],
       });
       fetchUsers();
     } catch (error: any) {
@@ -139,7 +195,6 @@ function UsersPage() {
     }
   };
 
-  // ✅ Открытие диалога редактирования
   const handleEditOpen = (user: User) => {
     setEditingUser(user);
     setEditForm({
@@ -153,7 +208,6 @@ function UsersPage() {
     setIsEditOpen(true);
   };
 
-  // ✅ Сохранение изменений
   const handleEditSave = async () => {
     if (!editingUser) return;
 
@@ -176,11 +230,11 @@ function UsersPage() {
   };
 
   const handleBlock = async (userId: string) => {
-    if (!confirm("Вы уверены, что хотите заблокировать сотрудника?")) return;
+    if (!confirm("Вы уверены, что хотите заблокировать сотрудника? Бот удалит его из всех чатов.")) return;
 
     try {
       await api.post(`/users/${userId}/block`);
-      toast.success("Сотрудник заблокирован");
+      toast.success("Сотрудник заблокирован и удалён из всех чатов");
       fetchUsers();
     } catch (error) {
       toast.error("Ошибка блокировки");
@@ -209,6 +263,28 @@ function UsersPage() {
     }
   };
 
+  const handleExportCSV = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (tagFilter !== "all") params.append("tagId", tagFilter);
+      if (search) {
+        params.append("search", search);
+        if (searchField !== "all") params.append("searchField", searchField);
+      }
+      const response = await api.get(`/users/export?${params}`, { responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `employees_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      toast.error("Ошибка экспорта");
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "ACTIVE":
@@ -226,127 +302,216 @@ function UsersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Сотрудники</h1>
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Добавить
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Новый сотрудник</DialogTitle>
-              <DialogDescription>
-                Добавьте нового сотрудника в систему
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="telegramId">Telegram ID *</Label>
-                <Input
-                  id="telegramId"
-                  type="number"
-                  placeholder="123456789"
-                  value={newUser.telegramId}
-                  onChange={(e) =>
-                    setNewUser({ ...newUser, telegramId: e.target.value })
-                  }
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="username">Username</Label>
-                <Input
-                  id="username"
-                  placeholder="username"
-                  value={newUser.username}
-                  onChange={(e) =>
-                    setNewUser({ ...newUser, username: e.target.value.startsWith("@") ? e.target.value.slice(1) : e.target.value })
-                  }
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="firstName">Имя</Label>
-                  <Input
-                    id="firstName"
-                    value={newUser.firstName}
-                    onChange={(e) =>
-                      setNewUser({ ...newUser, firstName: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="lastName">Фамилия</Label>
-                  <Input
-                    id="lastName"
-                    value={newUser.lastName}
-                    onChange={(e) =>
-                      setNewUser({ ...newUser, lastName: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="department">Отдел</Label>
-                <Input
-                  id="department"
-                  value={newUser.department}
-                  onChange={(e) =>
-                    setNewUser({ ...newUser, department: e.target.value })
-                  }
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="position">Должность</Label>
-                <Input
-                  id="position"
-                  value={newUser.position}
-                  onChange={(e) =>
-                    setNewUser({ ...newUser, position: e.target.value })
-                  }
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
-                Отмена
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExportCSV}>
+            <Download className="mr-2 h-4 w-4" />
+            Экспорт CSV
+          </Button>
+          <Dialog open={isCreateOpen} onOpenChange={(open) => { setIsCreateOpen(open); if (open) fetchRefData(); }}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Добавить
               </Button>
-              <Button onClick={handleCreateUser}>Создать</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Новый сотрудник</DialogTitle>
+                <DialogDescription>
+                  Добавьте нового сотрудника в систему
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="telegramId">Telegram ID *</Label>
+                  <Input
+                    id="telegramId"
+                    type="number"
+                    placeholder="123456789"
+                    value={newUser.telegramId}
+                    onChange={(e) => setNewUser({ ...newUser, telegramId: e.target.value })}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="username">Username</Label>
+                  <Input
+                    id="username"
+                    placeholder="username"
+                    value={newUser.username}
+                    onChange={(e) =>
+                      setNewUser({ ...newUser, username: e.target.value.startsWith("@") ? e.target.value.slice(1) : e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="firstName">Имя</Label>
+                    <Input
+                      id="firstName"
+                      value={newUser.firstName}
+                      onChange={(e) => setNewUser({ ...newUser, firstName: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="lastName">Фамилия</Label>
+                    <Input
+                      id="lastName"
+                      value={newUser.lastName}
+                      onChange={(e) => setNewUser({ ...newUser, lastName: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="phone">Телефон</Label>
+                  <Input
+                    id="phone"
+                    placeholder="+7 900 000 00 00"
+                    value={newUser.phone}
+                    onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="department">Отдел</Label>
+                  <Input
+                    id="department"
+                    value={newUser.department}
+                    onChange={(e) => setNewUser({ ...newUser, department: e.target.value })}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="position">Должность</Label>
+                  <Input
+                    id="position"
+                    value={newUser.position}
+                    onChange={(e) => setNewUser({ ...newUser, position: e.target.value })}
+                  />
+                </div>
+
+                {/* Tags */}
+                <div className="grid gap-2">
+                  <Label>
+                    Теги (рассылочные списки)
+                    {newUser.tagIds.length > 0 && (
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        выбрано: {newUser.tagIds.length}
+                      </span>
+                    )}
+                  </Label>
+                  {allTags.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Нет созданных тегов</p>
+                  ) : (
+                    <div className="border rounded-md divide-y max-h-36 overflow-y-auto">
+                      {allTags.map((tag) => (
+                        <label
+                          key={tag.id}
+                          className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-muted/50"
+                        >
+                          <input
+                            type="checkbox"
+                            className="h-3.5 w-3.5 shrink-0"
+                            checked={newUser.tagIds.includes(tag.id)}
+                            onChange={() => toggleNewUserTag(tag.id)}
+                          />
+                          <span
+                            className="w-2 h-2 rounded-full shrink-0"
+                            style={{ backgroundColor: tag.color || "#6b7280" }}
+                          />
+                          <span className="text-sm">{tag.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Chat package */}
+                <div className="grid gap-2">
+                  <Label htmlFor="chatPackage">Пакет чатов</Label>
+                  <Select
+                    value={newUser.chatPackageId}
+                    onValueChange={(v) => setNewUser({ ...newUser, chatPackageId: v })}
+                  >
+                    <SelectTrigger id="chatPackage">
+                      <SelectValue placeholder="Без пакета" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Без пакета</SelectItem>
+                      {allPackages.map((pkg) => (
+                        <SelectItem key={pkg.id} value={pkg.id}>
+                          {pkg.name}{pkg.isDefault ? " ★" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Бот автоматически отправит инвайт-ссылки на все чаты из пакета
+                  </p>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
+                  Отмена
+                </Button>
+                <Button onClick={handleCreateUser} disabled={!newUser.telegramId}>Создать</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
-      <form onSubmit={handleSearch} className="flex gap-2">
-        <Select value={searchField} onValueChange={(v) => setSearchField(v as typeof searchField)}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
+      {/* Search + filters */}
+      <div className="flex flex-wrap gap-2">
+        <form onSubmit={handleSearch} className="flex gap-2 flex-1 min-w-0">
+          <Select value={searchField} onValueChange={(v) => setSearchField(v as typeof searchField)}>
+            <SelectTrigger className="w-40 shrink-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Все поля</SelectItem>
+              <SelectItem value="name">Имя / Фамилия</SelectItem>
+              <SelectItem value="username">Username</SelectItem>
+              <SelectItem value="phone">Телефон</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="relative flex-1 min-w-[140px]">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder={
+                searchField === "username" ? "@username" :
+                searchField === "phone" ? "+7 900 000 00 00" :
+                searchField === "name" ? "Иван Иванов" :
+                "Поиск..."
+              }
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Button type="submit" variant="secondary">
+            Найти
+          </Button>
+        </form>
+
+        {/* Tag filter */}
+        <Select value={tagFilter} onValueChange={(v) => { setTagFilter(v); setTimeout(() => fetchUsers(1), 0); }}>
+          <SelectTrigger className="w-44 shrink-0">
+            <SelectValue placeholder="Фильтр по тегу" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Все поля</SelectItem>
-            <SelectItem value="name">Имя / Фамилия</SelectItem>
-            <SelectItem value="username">Username</SelectItem>
-            <SelectItem value="phone">Телефон</SelectItem>
+            <SelectItem value="all">Все теги</SelectItem>
+            {allTags.map((tag) => (
+              <SelectItem key={tag.id} value={tag.id}>
+                <span className="flex items-center gap-2">
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0 inline-block"
+                    style={{ backgroundColor: tag.color || "#6b7280" }}
+                  />
+                  {tag.name}
+                </span>
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder={
-              searchField === "username" ? "@username" :
-              searchField === "phone" ? "+7 900 000 00 00" :
-              searchField === "name" ? "Иван Иванов" :
-              "Поиск..."
-            }
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <Button type="submit" variant="secondary">
-          Найти
-        </Button>
-      </form>
+      </div>
 
       <div className="rounded-md border overflow-x-auto">
         <Table>
@@ -421,7 +586,6 @@ function UsersPage() {
                   <TableCell>{getStatusBadge(user.status)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      {/* ✅ Кнопка редактирования теперь работает */}
                       <Button
                         variant="ghost"
                         size="icon"
@@ -520,7 +684,7 @@ function UsersPage() {
         </div>
       )}
 
-      {/* ✅ Диалог редактирования */}
+      {/* Edit dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent>
           <DialogHeader>
@@ -532,7 +696,6 @@ function UsersPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            {/* Telegram ID — только чтение */}
             {editingUser && (
               <div className="grid gap-2">
                 <Label>Telegram ID</Label>

@@ -128,6 +128,19 @@ class UsersController {
       next(error);
     }
   }
+
+  async exportCsv(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { tagId, search, searchField } = req.query as Record<string, string | undefined>;
+      const csv = await usersService.exportCsv({ tagId, search, searchField });
+      const filename = `employees_${new Date().toISOString().slice(0, 10)}.csv`;
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.send("\uFEFF" + csv); // BOM для корректного открытия в Excel
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const usersController = new UsersController();

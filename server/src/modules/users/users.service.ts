@@ -438,6 +438,64 @@ class UsersService {
     };
   }
 
+  async exportCsv(filters: { tagId?: string; search?: string; searchField?: string }) {
+    const { tagId, search, searchField } = filters;
+    const where: Prisma.UserWhereInput = {};
+
+    if (search) {
+      if (searchField === "username") {
+        where.username = { contains: search, mode: "insensitive" };
+      } else if (searchField === "phone") {
+        where.phone = { contains: search };
+      } else if (searchField === "name") {
+        where.OR = [
+          { firstName: { contains: search, mode: "insensitive" } },
+          { lastName: { contains: search, mode: "insensitive" } },
+        ];
+      } else {
+        where.OR = [
+          { username: { contains: search, mode: "insensitive" } },
+          { firstName: { contains: search, mode: "insensitive" } },
+          { lastName: { contains: search, mode: "insensitive" } },
+          { phone: { contains: search } },
+        ];
+      }
+    }
+
+    if (tagId) where.tags = { some: { tagId } };
+
+    const users = await prisma.user.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      include: { tags: { include: { tag: true } } },
+    });
+
+    const escape = (v: string | null | undefined) => {
+      if (!v) return "";
+      const s = String(v);
+      return s.includes(",") || s.includes('"') || s.includes("\n")
+        ? `"${s.replace(/"/g, '""')}"`
+        : s;
+    };
+
+    const header = ["ID", "Telegram ID", "Username", "Имя", "Фамилия", "Телефон", "Отдел", "Должность", "Статус", "Теги", "Дата добавления"];
+    const rows = users.map((u) => [
+      escape(u.id),
+      escape(u.telegramId.toString()),
+      escape(u.username),
+      escape(u.firstName),
+      escape(u.lastName),
+      escape(u.phone),
+      escape(u.department),
+      escape(u.position),
+      escape(u.status),
+      escape((u.tags as any[]).map((t: any) => t.tag.name).join("; ")),
+      escape(u.createdAt.toISOString().slice(0, 10)),
+    ]);
+
+    return [header.join(","), ...rows.map((r) => r.join(","))].join("\r\n");
+  }
+
   private serializeUser(user: any) {
     return {
       ...user,

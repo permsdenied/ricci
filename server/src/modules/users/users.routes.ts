@@ -25,6 +25,10 @@ router.get("/stats", (req, res, next) =>
   usersController.getStats(req, res, next)
 );
 
+router.get("/export", (req, res, next) =>
+  usersController.exportCsv(req, res, next)
+);
+
 router.get("/:id", (req, res, next) =>
   usersController.findById(req, res, next)
 );
