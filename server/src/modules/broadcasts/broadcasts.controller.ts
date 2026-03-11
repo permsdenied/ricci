@@ -1,6 +1,10 @@
 import { Request, Response, NextFunction } from "express";
 import { broadcastsService } from "./broadcasts.service";
-import { CreateBroadcastDto, UpdateBroadcastDto, broadcastQuerySchema } from "./broadcasts.schema";
+import {
+  CreateBroadcastDto,
+  UpdateBroadcastDto,
+  broadcastQuerySchema,
+} from "./broadcasts.schema";
 
 class BroadcastsController {
   async create(req: Request, res: Response, next: NextFunction) {
@@ -27,7 +31,7 @@ class BroadcastsController {
 
   async findById(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await broadcastsService.findById(req.params.id);
+      const result = await broadcastsService.findById(req.params.id as string);
       res.json({ success: true, data: result });
     } catch (error) {
       next(error);
@@ -37,7 +41,7 @@ class BroadcastsController {
   async update(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await broadcastsService.update(
-        req.params.id,
+        req.params.id as string,
         req.body as UpdateBroadcastDto,
       );
       res.json({ success: true, data: result });
@@ -48,7 +52,7 @@ class BroadcastsController {
 
   async delete(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await broadcastsService.delete(req.params.id);
+      const result = await broadcastsService.delete(req.params.id as string);
       res.json({ success: true, data: result });
     } catch (error) {
       next(error);
@@ -57,7 +61,7 @@ class BroadcastsController {
 
   async send(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await broadcastsService.send(req.params.id);
+      const result = await broadcastsService.send(req.params.id as string);
       res.json({ success: true, data: result });
     } catch (error) {
       next(error);

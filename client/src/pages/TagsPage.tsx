@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -54,14 +53,20 @@ function TagsPage() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [newTag, setNewTag] = useState({ name: "", description: "", color: "#3B82F6" });
+  const [newTag, setNewTag] = useState({
+    name: "",
+    description: "",
+    color: "#3B82F6",
+  });
 
   // Управление пользователями тега
   const [managingTag, setManagingTag] = useState<Tag | null>(null);
   const [tagUsers, setTagUsers] = useState<TagUser[]>([]);
   const [allUsers, setAllUsers] = useState<AllUser[]>([]);
   const [userSearch, setUserSearch] = useState("");
-  const [userSearchField, setUserSearchField] = useState<"all" | "name" | "username" | "phone">("username");
+  const [userSearchField, setUserSearchField] = useState<
+    "all" | "name" | "username" | "phone"
+  >("username");
   const [isManageOpen, setIsManageOpen] = useState(false);
 
   useEffect(() => {
@@ -128,7 +133,9 @@ function TagsPage() {
   const handleRemoveUserFromTag = async (userId: string) => {
     if (!managingTag) return;
     try {
-      await api.delete(`/users/${userId}/tags`, { data: { tagIds: [managingTag.id] } });
+      await api.delete(`/users/${userId}/tags`, {
+        data: { tagIds: [managingTag.id] },
+      });
       setTagUsers((prev) => prev.filter((u) => u.id !== userId));
       fetchTags();
     } catch (error: any) {
@@ -148,7 +155,11 @@ function TagsPage() {
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64"><div className="text-muted-foreground">Загрузка...</div></div>;
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-muted-foreground">Загрузка...</div>
+      </div>
+    );
   }
 
   return (
@@ -157,33 +168,70 @@ function TagsPage() {
         <h1 className="text-3xl font-bold">Теги</h1>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
-            <Button><Plus className="mr-2 h-4 w-4" />Создать тег</Button>
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Создать тег
+            </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Новый тег</DialogTitle>
-              <DialogDescription>Создайте новый тег для сегментации сотрудников</DialogDescription>
+              <DialogDescription>
+                Создайте новый тег для сегментации сотрудников
+              </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
                 <Label htmlFor="name">Название *</Label>
-                <Input id="name" placeholder="IT-отдел" value={newTag.name} onChange={(e) => setNewTag({ ...newTag, name: e.target.value })} />
+                <Input
+                  id="name"
+                  placeholder="IT-отдел"
+                  value={newTag.name}
+                  onChange={(e) =>
+                    setNewTag({ ...newTag, name: e.target.value })
+                  }
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="description">Описание</Label>
-                <Input id="description" placeholder="Сотрудники IT отдела" value={newTag.description} onChange={(e) => setNewTag({ ...newTag, description: e.target.value })} />
+                <Input
+                  id="description"
+                  placeholder="Сотрудники IT отдела"
+                  value={newTag.description}
+                  onChange={(e) =>
+                    setNewTag({ ...newTag, description: e.target.value })
+                  }
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="color">Цвет</Label>
                 <div className="flex gap-2">
-                  <Input id="color" type="color" value={newTag.color} onChange={(e) => setNewTag({ ...newTag, color: e.target.value })} className="w-16 h-9 p-1" />
-                  <Input value={newTag.color} onChange={(e) => setNewTag({ ...newTag, color: e.target.value })} placeholder="#3B82F6" />
+                  <Input
+                    id="color"
+                    type="color"
+                    value={newTag.color}
+                    onChange={(e) =>
+                      setNewTag({ ...newTag, color: e.target.value })
+                    }
+                    className="w-16 h-9 p-1"
+                  />
+                  <Input
+                    value={newTag.color}
+                    onChange={(e) =>
+                      setNewTag({ ...newTag, color: e.target.value })
+                    }
+                    placeholder="#3B82F6"
+                  />
                 </div>
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Отмена</Button>
-              <Button onClick={handleCreate} disabled={!newTag.name}>Создать</Button>
+              <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
+                Отмена
+              </Button>
+              <Button onClick={handleCreate} disabled={!newTag.name}>
+                Создать
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -194,20 +242,33 @@ function TagsPage() {
           <Card key={tag.id}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-lg flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color || "#gray" }} />
+                <div
+                  className="w-3 h-3 rounded-full"
+                  style={{ backgroundColor: tag.color || "#gray" }}
+                />
                 {tag.name}
               </CardTitle>
               <div className="flex gap-1">
-                <Button variant="ghost" size="icon" onClick={() => handleManageOpen(tag)}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleManageOpen(tag)}
+                >
                   <UserPlus className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="icon" onClick={() => handleDelete(tag.id, tag.name)}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleDelete(tag.id, tag.name)}
+                >
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
               </div>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">{tag.description || "Без описания"}</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                {tag.description || "Без описания"}
+              </p>
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm">{tag.usersCount} сотрудников</span>
@@ -215,31 +276,56 @@ function TagsPage() {
             </CardContent>
           </Card>
         ))}
-        {tags.length === 0 && <div className="col-span-full text-center py-12 text-muted-foreground">Нет тегов. Создайте первый тег.</div>}
+        {tags.length === 0 && (
+          <div className="col-span-full text-center py-12 text-muted-foreground">
+            Нет тегов. Создайте первый тег.
+          </div>
+        )}
       </div>
       {/* Диалог управления пользователями тега */}
       <Dialog open={isManageOpen} onOpenChange={setIsManageOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Сотрудники тега «{managingTag?.name}»</DialogTitle>
-            <DialogDescription>Добавляйте и удаляйте сотрудников из тега</DialogDescription>
+            <DialogDescription>
+              Добавляйте и удаляйте сотрудников из тега
+            </DialogDescription>
           </DialogHeader>
 
-          <div className="grid grid-cols-2 gap-4 py-2" style={{ maxHeight: "60vh" }}>
+          <div
+            className="grid grid-cols-2 gap-4 py-2"
+            style={{ maxHeight: "60vh" }}
+          >
             {/* Левая колонка: текущие пользователи тега */}
             <div className="flex flex-col gap-2">
               <p className="text-sm font-medium">В теге ({tagUsers.length})</p>
-              <div className="border rounded-md overflow-y-auto" style={{ maxHeight: "45vh" }}>
+              <div
+                className="border rounded-md overflow-y-auto"
+                style={{ maxHeight: "45vh" }}
+              >
                 {tagUsers.length === 0 ? (
-                  <p className="text-sm text-muted-foreground p-3">Нет сотрудников</p>
+                  <p className="text-sm text-muted-foreground p-3">
+                    Нет сотрудников
+                  </p>
                 ) : (
                   tagUsers.map((u) => (
-                    <div key={u.id} className="flex items-center justify-between px-3 py-2 hover:bg-muted">
+                    <div
+                      key={u.id}
+                      className="flex items-center justify-between px-3 py-2 hover:bg-muted"
+                    >
                       <div>
-                        <p className="text-sm font-medium">{u.firstName} {u.lastName}</p>
-                        <p className="text-xs text-muted-foreground">@{u.username || u.telegramId}</p>
+                        <p className="text-sm font-medium">
+                          {u.firstName} {u.lastName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          @{u.username || u.telegramId}
+                        </p>
                       </div>
-                      <Button variant="ghost" size="icon" onClick={() => handleRemoveUserFromTag(u.id)}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRemoveUserFromTag(u.id)}
+                      >
                         <X className="h-3 w-3 text-destructive" />
                       </Button>
                     </div>
@@ -251,7 +337,12 @@ function TagsPage() {
             {/* Правая колонка: все активные пользователи */}
             <div className="flex flex-col gap-2">
               <p className="text-sm font-medium">Добавить сотрудника</p>
-              <Select value={userSearchField} onValueChange={(v) => setUserSearchField(v as typeof userSearchField)}>
+              <Select
+                value={userSearchField}
+                onValueChange={(v) =>
+                  setUserSearchField(v as typeof userSearchField)
+                }
+              >
                 <SelectTrigger className="h-8 text-sm">
                   <SelectValue />
                 </SelectTrigger>
@@ -267,33 +358,60 @@ function TagsPage() {
                 <Input
                   className="pl-7 h-8 text-sm"
                   placeholder={
-                    userSearchField === "username" ? "@username" :
-                    userSearchField === "phone" ? "+7 900 000 00 00" :
-                    userSearchField === "name" ? "Иван Иванов" :
-                    "Поиск..."
+                    userSearchField === "username"
+                      ? "@username"
+                      : userSearchField === "phone"
+                        ? "+7 900 000 00 00"
+                        : userSearchField === "name"
+                          ? "Иван Иванов"
+                          : "Поиск..."
                   }
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
                 />
               </div>
-              <div className="border rounded-md overflow-y-auto" style={{ maxHeight: "35vh" }}>
+              <div
+                className="border rounded-md overflow-y-auto"
+                style={{ maxHeight: "35vh" }}
+              >
                 {allUsers
                   .filter((u) => !tagUsers.some((tu) => tu.id === u.id))
                   .filter((u) => {
                     const q = userSearch.toLowerCase();
                     if (!q) return true;
-                    if (userSearchField === "username") return u.username?.toLowerCase().includes(q);
-                    if (userSearchField === "phone") return u.phone?.includes(q);
-                    if (userSearchField === "name") return u.firstName?.toLowerCase().includes(q) || u.lastName?.toLowerCase().includes(q);
-                    return u.firstName?.toLowerCase().includes(q) || u.lastName?.toLowerCase().includes(q) || u.username?.toLowerCase().includes(q);
+                    if (userSearchField === "username")
+                      return u.username?.toLowerCase().includes(q);
+                    if (userSearchField === "phone")
+                      return u.phone?.includes(q);
+                    if (userSearchField === "name")
+                      return (
+                        u.firstName?.toLowerCase().includes(q) ||
+                        u.lastName?.toLowerCase().includes(q)
+                      );
+                    return (
+                      u.firstName?.toLowerCase().includes(q) ||
+                      u.lastName?.toLowerCase().includes(q) ||
+                      u.username?.toLowerCase().includes(q)
+                    );
                   })
                   .map((u) => (
-                    <div key={u.id} className="flex items-center justify-between px-3 py-2 hover:bg-muted">
+                    <div
+                      key={u.id}
+                      className="flex items-center justify-between px-3 py-2 hover:bg-muted"
+                    >
                       <div>
-                        <p className="text-sm font-medium">{u.firstName} {u.lastName}</p>
-                        <p className="text-xs text-muted-foreground">@{u.username || u.telegramId}</p>
+                        <p className="text-sm font-medium">
+                          {u.firstName} {u.lastName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          @{u.username || u.telegramId}
+                        </p>
                       </div>
-                      <Button variant="ghost" size="icon" onClick={() => handleAddUserToTag(u.id)}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleAddUserToTag(u.id)}
+                      >
                         <Plus className="h-3 w-3 text-primary" />
                       </Button>
                     </div>
@@ -303,7 +421,9 @@ function TagsPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsManageOpen(false)}>Закрыть</Button>
+            <Button variant="outline" onClick={() => setIsManageOpen(false)}>
+              Закрыть
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

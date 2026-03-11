@@ -21,9 +21,9 @@ server/.env
 server/.env.*
 !server/.env.example
 
-# Runtime and uploads
-uploads/
-server/uploads/
+# Runtime uploads (not source code)
+/uploads/
+/server/uploads/
 
 # Logs
 logs/
