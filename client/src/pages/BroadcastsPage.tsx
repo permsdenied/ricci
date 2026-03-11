@@ -50,6 +50,11 @@ interface InlineButton {
   url: string;
 }
 
+interface MediaItem {
+  url: string;
+  type: MediaType;
+}
+
 interface Broadcast {
   id: string;
   title: string | null;
@@ -101,8 +106,7 @@ interface Chat {
 interface FormState {
   title: string;
   content: string;
-  mediaUrl: string;
-  mediaType: MediaType | "";
+  mediaItems: MediaItem[];
   buttons: InlineButton[];
   targetType: TargetType;
   tagIds: string[];
@@ -113,8 +117,7 @@ interface FormState {
 const EMPTY_FORM: FormState = {
   title: "",
   content: "",
-  mediaUrl: "",
-  mediaType: "",
+  mediaItems: [],
   buttons: [],
   targetType: "ALL_USERS",
   tagIds: [],
@@ -504,8 +507,7 @@ function BroadcastsPage() {
   const buildPayload = (sendNow: boolean) => ({
     title: form.title || undefined,
     content: form.content,
-    mediaUrl: form.mediaUrl || undefined,
-    mediaType: (form.mediaType || undefined) as MediaType | undefined,
+    mediaItems: form.mediaItems.length > 0 ? form.mediaItems : undefined,
     buttons: form.buttons.filter((b) => b.text && b.url),
     targetType: form.targetType,
     tagIds: form.targetType === "TAG" ? form.tagIds : undefined,
@@ -684,8 +686,8 @@ function BroadcastsPage() {
                   <TelegramPreview
                     content={form.content}
                     buttons={form.buttons}
-                    mediaUrl={form.mediaUrl || undefined}
-                    mediaType={form.mediaType || undefined}
+                    mediaUrl={form.mediaItems[0]?.url}
+                    mediaType={form.mediaItems[0]?.type}
                   />
                 )}
                 <p className="text-xs text-muted-foreground">
@@ -693,35 +695,108 @@ function BroadcastsPage() {
                 </p>
               </div>
 
-              {/* Media */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>URL медиа (необязательно)</Label>
-                  <Input
-                    placeholder="https://..."
-                    value={form.mediaUrl}
-                    onChange={(e) => setForm({ ...form, mediaUrl: e.target.value })}
-                  />
+              {/* Media items */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>
+                    Медиа-файлы
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      до 10 элементов
+                    </span>
+                  </Label>
+                  {form.mediaItems.length < 10 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setForm({
+                          ...form,
+                          mediaItems: [...form.mediaItems, { url: "", type: "image" }],
+                        })
+                      }
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1" />
+                      Добавить медиа
+                    </Button>
+                  )}
                 </div>
-                <div className="space-y-1.5">
-                  <Label>Тип медиа</Label>
-                  <Select
-                    value={form.mediaType}
-                    onValueChange={(v) =>
-                      setForm({ ...form, mediaType: v as MediaType | "" })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Выберите тип" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="image">Изображение</SelectItem>
-                      <SelectItem value="video">Видео</SelectItem>
-                      <SelectItem value="document">Документ</SelectItem>
-                      <SelectItem value="audio">Аудио</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+
+                {/* Warning: multiple media → users */}
+                {form.mediaItems.length > 1 &&
+                  (form.targetType === "TAG" || form.targetType === "ALL_USERS") && (
+                    <div className="rounded-md border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/30 px-3 py-2 text-sm text-yellow-800 dark:text-yellow-300">
+                      <strong>Внимание:</strong> рассылка с несколькими медиа в личные сообщения
+                      каждому сотруднику может занять очень много времени (≈35 мс × кол-во
+                      получателей). Рекомендуем отправлять такой контент в чат, а не каждому
+                      лично.
+                    </div>
+                  )}
+
+                {form.mediaItems.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Нет медиа. Можно перетащить файл в редактор выше или добавить URL.
+                  </p>
+                )}
+
+                {form.mediaItems.map((item, idx) => (
+                  <div key={idx} className="flex gap-2 items-start">
+                    <div className="flex-1 grid grid-cols-[1fr_140px] gap-2">
+                      <Input
+                        placeholder="https://... (URL файла)"
+                        value={item.url}
+                        onChange={(e) => {
+                          const next = [...form.mediaItems];
+                          next[idx] = { ...next[idx], url: e.target.value };
+                          setForm({ ...form, mediaItems: next });
+                        }}
+                      />
+                      <Select
+                        value={item.type}
+                        onValueChange={(v) => {
+                          const next = [...form.mediaItems];
+                          next[idx] = { ...next[idx], type: v as MediaType };
+                          setForm({ ...form, mediaItems: next });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="image">Фото</SelectItem>
+                          <SelectItem value="video">Видео</SelectItem>
+                          <SelectItem value="document">Документ</SelectItem>
+                          <SelectItem value="audio">Аудио</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0"
+                      onClick={() =>
+                        setForm({
+                          ...form,
+                          mediaItems: form.mediaItems.filter((_, i) => i !== idx),
+                        })
+                      }
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+
+                {form.mediaItems.length > 1 && (
+                  <p className="text-xs text-muted-foreground">
+                    Фото и видео будут отправлены как альбом (медиагруппа). Текст сообщения
+                    станет подписью к первому элементу.
+                    {form.mediaItems.filter(
+                      (m) => m.type !== "image" && m.type !== "video",
+                    ).length > 0 &&
+                      " Документы и аудио будут отправлены отдельными сообщениями."}
+                  </p>
+                )}
               </div>
 
               {/* Inline buttons */}

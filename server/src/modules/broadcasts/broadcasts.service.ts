@@ -42,9 +42,39 @@ async function sendBroadcastMessage(
   const buttons = broadcast.buttons as Array<{ text: string; url: string }> | null;
   const markup = buildInlineKeyboard(buttons ?? []);
   const options = { parse_mode: "HTML" as const, reply_markup: markup };
-
   const htmlContent = markdownToTelegramHtml(broadcast.content);
-  return sendMedia(chatId, htmlContent, broadcast.mediaUrl, broadcast.mediaType, options);
+
+  // Если есть несколько медиа — отправляем медиагруппу
+  const mediaItems = broadcast.mediaItems as Array<{ url: string; type: string }> | null;
+  if (mediaItems && mediaItems.length > 1) {
+    // sendMediaGroup поддерживает только photo и video
+    const groupable = mediaItems.filter((m) => m.type === "image" || m.type === "video");
+    if (groupable.length > 1) {
+      const mediaGroup = groupable.map((item, idx) => ({
+        type: item.type === "image" ? ("photo" as const) : ("video" as const),
+        media: item.url,
+        // Текст сообщения ставим на первый элемент
+        ...(idx === 0 ? { caption: htmlContent, parse_mode: "HTML" } : {}),
+      }));
+      await telegramBot.sendMediaGroup(chatId, mediaGroup);
+      // Если есть документы/аудио — отправляем дополнительно
+      const other = mediaItems.filter((m) => m.type !== "image" && m.type !== "video");
+      for (const item of other) {
+        await sendMedia(chatId, "", item.url, item.type, {});
+      }
+      // Если есть кнопки — отдельным сообщением (Telegram не поддерживает кнопки в медиагруппе)
+      if (buttons && buttons.length > 0) {
+        await telegramBot.sendMessage(chatId, "↑", { reply_markup: markup });
+      }
+      return;
+    }
+  }
+
+  // Одно медиа или без медиа — стандартная отправка
+  const firstMedia = mediaItems && mediaItems.length === 1 ? mediaItems[0] : null;
+  const mediaUrl = firstMedia?.url ?? broadcast.mediaUrl ?? null;
+  const mediaType = firstMedia?.type ?? broadcast.mediaType ?? null;
+  return sendMedia(chatId, htmlContent, mediaUrl, mediaType, options);
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -60,6 +90,7 @@ class BroadcastsService {
         content: dto.content,
         mediaUrl: dto.mediaUrl,
         mediaType: dto.mediaType,
+        mediaItems: dto.mediaItems?.length ? dto.mediaItems : undefined,
         buttons: dto.buttons ?? [],
         targetType: dto.targetType,
         status: dto.scheduledAt ? "SCHEDULED" : "DRAFT",
@@ -180,6 +211,7 @@ class BroadcastsService {
           content: dto.content,
           mediaUrl: dto.mediaUrl,
           mediaType: dto.mediaType,
+          mediaItems: dto.mediaItems !== undefined ? (dto.mediaItems ?? undefined) : undefined,
           buttons: dto.buttons ?? undefined,
           targetType: dto.targetType,
           scheduledAt: dto.scheduledAt !== undefined

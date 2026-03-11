@@ -117,6 +117,25 @@ export const telegramBot = {
   },
 
   /**
+   * Отправить группу медиа (фото/видео альбом, до 10 элементов)
+   * Текст подписи ставится на первый элемент
+   */
+  sendMediaGroup(
+    chatId: number | string,
+    media: Array<{
+      type: "photo" | "video" | "document" | "audio";
+      media: string;
+      caption?: string;
+      parse_mode?: string;
+    }>,
+  ) {
+    return apiCall<Array<{ message_id: number }>>("sendMediaGroup", {
+      chat_id: chatId,
+      media,
+    });
+  },
+
+  /**
    * Забанить пользователя в чате (кик с баном)
    */
   banChatMember(chatId: number | string, userId: number) {

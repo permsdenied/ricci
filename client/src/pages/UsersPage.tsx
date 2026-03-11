@@ -126,7 +126,7 @@ function UsersPage() {
     }
   };
 
-  const fetchUsers = async (page = 1) => {
+  const fetchUsers = async (page = 1, currentTagFilter = tagFilter) => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
@@ -136,7 +136,7 @@ function UsersPage() {
         params.append("search", search);
         if (searchField !== "all") params.append("searchField", searchField);
       }
-      if (tagFilter !== "all") params.append("tagId", tagFilter);
+      if (currentTagFilter !== "all") params.append("tagId", currentTagFilter);
 
       const response = await api.get(`/users?${params}`);
       setUsers(response.data.data);
@@ -492,7 +492,7 @@ function UsersPage() {
         </form>
 
         {/* Tag filter */}
-        <Select value={tagFilter} onValueChange={(v) => { setTagFilter(v); setTimeout(() => fetchUsers(1), 0); }}>
+        <Select value={tagFilter} onValueChange={(v) => { setTagFilter(v); fetchUsers(1, v); }}>
           <SelectTrigger className="w-44 shrink-0">
             <SelectValue placeholder="Фильтр по тегу" />
           </SelectTrigger>

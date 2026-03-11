@@ -228,8 +228,9 @@ model Broadcast {
   id          String              @id @default(cuid())
   title       String?             // Название для админки
   content     String              // Текст сообщения
-  mediaUrl    String?             // URL картинки/видео
+  mediaUrl    String?             // URL картинки/видео (одиночное, для совместимости)
   mediaType   String?             // image, video, document, audio
+  mediaItems  Json?               // Массив медиа [{url, type}] — для медиагруппы (до 10 элем.)
   buttons     Json?               // Inline кнопки [{text, url}]
   
   targetType  BroadcastTargetType
