@@ -174,7 +174,7 @@ function UsersPage() {
         position: newUser.position || undefined,
         phone: newUser.phone || undefined,
         tagIds: newUser.tagIds.length > 0 ? newUser.tagIds : undefined,
-        chatPackageId: newUser.chatPackageId || undefined,
+        chatPackageId: (newUser.chatPackageId && newUser.chatPackageId !== "none") ? newUser.chatPackageId : undefined,
       });
       toast.success("Сотрудник создан");
       setIsCreateOpen(false);
@@ -434,7 +434,7 @@ function UsersPage() {
                       <SelectValue placeholder="Без пакета" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Без пакета</SelectItem>
+                      <SelectItem value="none">Без пакета</SelectItem>
                       {allPackages.map((pkg) => (
                         <SelectItem key={pkg.id} value={pkg.id}>
                           {pkg.name}{pkg.isDefault ? " ★" : ""}
