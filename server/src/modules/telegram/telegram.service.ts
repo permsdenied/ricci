@@ -270,6 +270,17 @@ class TelegramService {
   private async handleBotStart(from: TelegramUser) {
     console.log(`🚀 User ${from.id} started bot`);
 
+    // Проверяем, не заблокирован ли пользователь
+    const existing = await prisma.user.findUnique({
+      where: { telegramId: BigInt(from.id) },
+      select: { status: true },
+    });
+
+    if (existing?.status === "BLOCKED") {
+      console.log(`[Bot] Blocked user ${from.id} tried to start bot — ignoring`);
+      return;
+    }
+
     const user = await prisma.user.upsert({
       where: { telegramId: BigInt(from.id) },
       create: {
