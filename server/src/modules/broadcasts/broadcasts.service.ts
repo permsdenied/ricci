@@ -12,6 +12,7 @@ import { Broadcast, BroadcastStatus } from "@prisma/client";
 const INCLUDE_FULL = {
   targetTags: { include: { tag: { select: { id: true, name: true } } } },
   targetChats: { include: { chat: { select: { id: true, title: true, telegramId: true } } } },
+  targetUsers: { include: { user: { select: { id: true, firstName: true, lastName: true, username: true } } } },
   createdBy: { select: { id: true, name: true, email: true } },
   _count: { select: { recipients: true } },
 };
@@ -24,6 +25,7 @@ function serializeBroadcast(b: any) {
       ...bc.chat,
       telegramId: bc.chat.telegramId?.toString(),
     })) ?? [],
+    targetUsers: b.targetUsers?.map((bu: any) => bu.user) ?? [],
     recipientsCount: b._count?.recipients,
     _count: undefined,
   };
@@ -101,6 +103,9 @@ class BroadcastsService {
           : undefined,
         targetChats: dto.chatIds?.length
           ? { create: dto.chatIds.map((chatId) => ({ chatId })) }
+          : undefined,
+        targetUsers: dto.userIds?.length
+          ? { create: dto.userIds.map((userId) => ({ userId })) }
           : undefined,
       },
       include: INCLUDE_FULL,
@@ -197,6 +202,15 @@ class BroadcastsService {
         }
       }
 
+      if (dto.userIds !== undefined) {
+        await tx.broadcastUser.deleteMany({ where: { broadcastId: id } });
+        if (dto.userIds.length > 0) {
+          await tx.broadcastUser.createMany({
+            data: dto.userIds.map((userId) => ({ broadcastId: id, userId })),
+          });
+        }
+      }
+
       const newStatus =
         dto.scheduledAt !== undefined
           ? dto.scheduledAt
@@ -251,6 +265,7 @@ class BroadcastsService {
       include: {
         targetTags: true,
         targetChats: { include: { chat: { select: { telegramId: true, title: true } } } },
+        targetUsers: { include: { user: { select: { id: true, telegramId: true } } } },
       },
     });
 
@@ -272,6 +287,18 @@ class BroadcastsService {
     );
 
     return { message: "Broadcast sending started" };
+  }
+
+  // Загружаем broadcast вместе с targetUsers для executeSend
+  private async loadBroadcastForSend(id: string) {
+    return prisma.broadcast.findUnique({
+      where: { id },
+      include: {
+        targetTags: true,
+        targetChats: { include: { chat: { select: { telegramId: true, title: true } } } },
+        targetUsers: { include: { user: { select: { id: true, telegramId: true } } } },
+      },
+    });
   }
 
   /**
@@ -343,9 +370,13 @@ class BroadcastsService {
         select: { id: true, telegramId: true },
       });
 
-      // Дедупликация (пользователь может иметь несколько тегов из списка)
       const unique = Array.from(new Map(users.map((u) => [u.id, u])).values());
       await this.sendDmsToUsers(unique, broadcast);
+    } else if (broadcast.targetType === "SPECIFIC_USERS") {
+      // Берём пользователей прямо из targetUsers (уже загружены в broadcast)
+      const users = (broadcast.targetUsers as Array<{ user: { id: string; telegramId: bigint } }>)
+        .map((bu) => bu.user);
+      await this.sendDmsToUsers(users, broadcast);
     }
   }
 
@@ -397,6 +428,7 @@ class BroadcastsService {
       include: {
         targetTags: true,
         targetChats: { include: { chat: { select: { telegramId: true, title: true } } } },
+        targetUsers: { include: { user: { select: { id: true, telegramId: true } } } },
       },
     });
 

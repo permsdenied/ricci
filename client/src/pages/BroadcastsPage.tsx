@@ -43,12 +43,14 @@ import {
   FileAudio,
   File,
   Link,
+  Search,
+  UserCheck,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
 type BroadcastStatus = "DRAFT" | "SCHEDULED" | "SENDING" | "SENT" | "FAILED";
-type TargetType = "CHAT" | "TAG" | "ALL_USERS";
+type TargetType = "CHAT" | "TAG" | "ALL_USERS" | "SPECIFIC_USERS";
 type MediaType = "image" | "video" | "document" | "audio";
 
 interface InlineButton {
@@ -60,6 +62,13 @@ interface MediaItem {
   url: string;
   type: MediaType;
   name?: string; // для отображения имени загруженного файла
+}
+
+interface TargetUser {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  username: string | null;
 }
 
 interface Broadcast {
@@ -76,6 +85,7 @@ interface Broadcast {
   createdAt: string;
   targetTags: Array<{ id: string; name: string }>;
   targetChats: Array<{ id: string; title: string }>;
+  targetUsers: TargetUser[];
   recipientsCount: number;
   createdBy: { name: string };
 }
@@ -118,6 +128,7 @@ interface FormState {
   targetType: TargetType;
   tagIds: string[];
   chatIds: string[];
+  userIds: string[];
   scheduledAt: string;
 }
 
@@ -129,6 +140,7 @@ const EMPTY_FORM: FormState = {
   targetType: "ALL_USERS",
   tagIds: [],
   chatIds: [],
+  userIds: [],
   scheduledAt: "",
 };
 
@@ -490,6 +502,19 @@ function TargetBadge({ broadcast }: { broadcast: Broadcast }) {
       </div>
     );
   }
+  if (broadcast.targetType === "SPECIFIC_USERS") {
+    const users = broadcast.targetUsers ?? [];
+    const label = users.length === 0
+      ? "—"
+      : users.slice(0, 2).map((u) => [u.firstName, u.lastName].filter(Boolean).join(" ") || u.username || "?").join(", ")
+        + (users.length > 2 ? ` +${users.length - 2}` : "");
+    return (
+      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+        <UserCheck className="h-3.5 w-3.5" />
+        <span>{label}</span>
+      </div>
+    );
+  }
   return (
     <div className="flex items-center gap-1 text-sm text-muted-foreground">
       <MessageSquare className="h-3.5 w-3.5" />
@@ -552,6 +577,101 @@ function CheckboxList<T extends { id: string; name?: string; title?: string }>({
           <span className="text-sm">{renderLabel(item)}</span>
         </label>
       ))}
+    </div>
+  );
+}
+
+// ── User picker ──────────────────────────────────────────────────────────────
+
+interface UserOption {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  username: string | null;
+}
+
+function UserPicker({
+  selected,
+  onChange,
+}: {
+  selected: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [results, setResults] = useState<UserOption[]>([]);
+  const [loading, setLoading] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const doSearch = async (q: string) => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ limit: "30", page: "1" });
+      if (q) params.set("search", q);
+      const res = await api.get(`/users?${params}`);
+      setResults(res.data.data);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    doSearch("");
+  }, []);
+
+  const onSearchChange = (v: string) => {
+    setSearch(v);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => doSearch(v), 300);
+  };
+
+  const toggle = (id: string) =>
+    onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+
+  const userName = (u: UserOption) => {
+    const full = [u.firstName, u.lastName].filter(Boolean).join(" ");
+    if (full) return full;
+    if (u.username) return `@${u.username}`;
+    return `ID: ${u.id.slice(0, 8)}`;
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Поиск по имени или @username..."
+          value={search}
+          onChange={(e) => onSearchChange(e.target.value)}
+          className="pl-8"
+        />
+      </div>
+
+      <div className="max-h-48 overflow-y-auto border rounded-md divide-y">
+        {loading && (
+          <p className="text-sm text-muted-foreground text-center py-3">Загрузка...</p>
+        )}
+        {!loading && results.length === 0 && (
+          <p className="text-sm text-muted-foreground text-center py-3">Не найдено</p>
+        )}
+        {results.map((u) => (
+          <label key={u.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50">
+            <input
+              type="checkbox"
+              className="h-4 w-4 shrink-0"
+              checked={selected.includes(u.id)}
+              onChange={() => toggle(u.id)}
+            />
+            <span className="text-sm flex-1">{userName(u)}</span>
+            {u.username && <span className="text-xs text-muted-foreground">@{u.username}</span>}
+          </label>
+        ))}
+      </div>
+
+      {selected.length > 0 && (
+        <p className="text-xs text-muted-foreground">Выбрано: {selected.length}</p>
+      )}
     </div>
   );
 }
@@ -627,6 +747,7 @@ function BroadcastsPage() {
     targetType: form.targetType,
     tagIds: form.targetType === "TAG" ? form.tagIds : undefined,
     chatIds: form.targetType === "CHAT" ? form.chatIds : undefined,
+    userIds: form.targetType === "SPECIFIC_USERS" ? form.userIds : undefined,
     scheduledAt: !sendNow && form.scheduledAt ? new Date(form.scheduledAt).toISOString() : undefined,
   });
 
@@ -814,7 +935,7 @@ function BroadcastsPage() {
               {/* Target type */}
               <Select
                 value={form.targetType}
-                onValueChange={(v) => setForm({ ...form, targetType: v as TargetType, tagIds: [], chatIds: [] })}
+                onValueChange={(v) => setForm({ ...form, targetType: v as TargetType, tagIds: [], chatIds: [], userIds: [] })}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -825,6 +946,9 @@ function BroadcastsPage() {
                   </SelectItem>
                   <SelectItem value="TAG">
                     <div className="flex items-center gap-2"><Tag className="h-4 w-4" />По тегу (в личку)</div>
+                  </SelectItem>
+                  <SelectItem value="SPECIFIC_USERS">
+                    <div className="flex items-center gap-2"><UserCheck className="h-4 w-4" />Конкретные пользователи</div>
                   </SelectItem>
                   <SelectItem value="CHAT">
                     <div className="flex items-center gap-2"><MessageSquare className="h-4 w-4" />В чаты / каналы</div>
@@ -843,6 +967,13 @@ function BroadcastsPage() {
                       {tag.name}
                     </span>
                   )}
+                />
+              )}
+
+              {form.targetType === "SPECIFIC_USERS" && (
+                <UserPicker
+                  selected={form.userIds}
+                  onChange={(ids) => setForm({ ...form, userIds: ids })}
                 />
               )}
 

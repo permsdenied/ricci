@@ -39,9 +39,10 @@ enum BroadcastStatus {
 }
 
 enum BroadcastTargetType {
-  CHAT      // Конкретный чат/канал
-  TAG       // Список интересов (в личку)
-  ALL_USERS // Глобальная рассылка
+  CHAT           // Конкретный чат/канал
+  TAG            // Список интересов (в личку)
+  ALL_USERS      // Глобальная рассылка
+  SPECIFIC_USERS // Конкретные пользователи
 }
 
 enum AdminRole {
@@ -86,10 +87,11 @@ model User {
   blockedAt   DateTime?  // Дата увольнения/блокировки
 
   // Relations
-  tags              UserTag[]
-  chatMemberships   ChatMembership[]
-  inviteLinks       InviteLink[]
+  tags                UserTag[]
+  chatMemberships     ChatMembership[]
+  inviteLinks         InviteLink[]
   broadcastRecipients BroadcastRecipient[]
+  broadcastTargets    BroadcastUser[]
 
   @@index([username])
   @@index([phone])
@@ -244,10 +246,11 @@ model Broadcast {
   updatedAt   DateTime            @updatedAt
 
   // Relations
-  createdBy  Admin               @relation("CreatedBy", fields: [createdById], references: [id])
-  targetTags BroadcastTag[]
+  createdBy   Admin                @relation("CreatedBy", fields: [createdById], references: [id])
+  targetTags  BroadcastTag[]
   targetChats BroadcastChat[]
-  recipients BroadcastRecipient[]
+  targetUsers BroadcastUser[]
+  recipients  BroadcastRecipient[]
 
   @@index([status])
   @@index([scheduledAt])
@@ -265,6 +268,19 @@ model BroadcastTag {
 
   @@unique([broadcastId, tagId])
   @@map("broadcast_tags")
+}
+
+/// Конкретные пользователи рассылки (targetType=SPECIFIC_USERS)
+model BroadcastUser {
+  id          String @id @default(cuid())
+  broadcastId String
+  userId      String
+
+  broadcast Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([broadcastId, userId])
+  @@map("broadcast_users")
 }
 
 /// Целевые чаты рассылки

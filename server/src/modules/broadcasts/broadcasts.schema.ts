@@ -15,13 +15,14 @@ export const createBroadcastSchema = z.object({
   content: z.string().min(1, "Message content is required"),
   mediaUrl: z.string().url().optional(),
   mediaType: z.enum(["image", "video", "document", "audio"]).optional(),
-  mediaItems: z.array(mediaItemSchema).max(10).optional(), // до 10 элементов (лимит Telegram)
+  mediaItems: z.array(mediaItemSchema).max(10).optional(),
   buttons: z.array(inlineButtonSchema).optional(),
 
   // Таргетинг
-  targetType: z.enum(["CHAT", "TAG", "ALL_USERS"]),
+  targetType: z.enum(["CHAT", "TAG", "ALL_USERS", "SPECIFIC_USERS"]),
   tagIds: z.array(z.string()).optional(),   // для targetType=TAG
   chatIds: z.array(z.string()).optional(),  // для targetType=CHAT
+  userIds: z.array(z.string()).optional(),  // для targetType=SPECIFIC_USERS
 
   // Отложенная отправка
   scheduledAt: z.string().datetime().optional(),
@@ -34,9 +35,10 @@ export const updateBroadcastSchema = z.object({
   mediaType: z.enum(["image", "video", "document", "audio"]).nullable().optional(),
   mediaItems: z.array(mediaItemSchema).max(10).nullable().optional(),
   buttons: z.array(inlineButtonSchema).nullable().optional(),
-  targetType: z.enum(["CHAT", "TAG", "ALL_USERS"]).optional(),
+  targetType: z.enum(["CHAT", "TAG", "ALL_USERS", "SPECIFIC_USERS"]).optional(),
   tagIds: z.array(z.string()).optional(),
   chatIds: z.array(z.string()).optional(),
+  userIds: z.array(z.string()).optional(),
   scheduledAt: z.string().datetime().nullable().optional(),
 });
 

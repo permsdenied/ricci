@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(DATABASE_URL=\"postgresql://postgres:password@localhost:5432/ricci_db\" npx prisma migrate dev --name add_specific_users_broadcast)",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}
