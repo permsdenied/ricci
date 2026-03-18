@@ -1,7 +1,7 @@
 import prisma from "../../db/client";
 import { ChatType } from "@prisma/client";
 import { telegramBot, buildInlineKeyboard } from "../../lib/telegram-bot";
-import { sendInviteLinksToUser } from "../users/users.service";
+import { sendInviteLinksToUser, triggerOnboarding } from "../users/users.service";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Telegram Update types
@@ -289,23 +289,58 @@ class TelegramService {
       },
     });
 
-    // Проверяем, есть ли отложенные инвайт-ссылки (созданные до того, как он нажал /start)
+    // 1. Проверяем отложенные инвайт-ссылки (созданные до того, как он нажал /start)
     const pendingLinks = await prisma.inviteLink.findMany({
-      where: {
-        userId: user.id,
-        usedAt: null,
-        expiresAt: { gt: new Date() },
-      },
-      include: { chat: { select: { title: true } } },
+      where: { userId: user.id, usedAt: null, expiresAt: { gt: new Date() } },
+      include: { chat: { select: { title: true, id: true } } },
+    });
+    const pendingChatIds = new Set(pendingLinks.map((l) => l.chatId));
+
+    // 2. Авто-отправка дефолтного пакета для чатов, которых ещё нет у пользователя
+    let sentDefaultPackage = false;
+    const defaultPkg = await prisma.chatPackage.findFirst({
+      where: { isDefault: true },
+      include: { items: { select: { chatId: true } } },
     });
 
+    if (defaultPkg && defaultPkg.items.length > 0) {
+      const allDefaultChatIds = defaultPkg.items.map((i) => i.chatId);
+
+      const existingMemberships = await prisma.chatMembership.findMany({
+        where: { userId: user.id, chatId: { in: allDefaultChatIds } },
+        select: { chatId: true },
+      });
+      const existingChatIds = new Set(existingMemberships.map((m) => m.chatId));
+
+      // Берём только те чаты, где нет ни membership, ни pending-ссылки
+      const newChatIds = allDefaultChatIds.filter(
+        (id) => !existingChatIds.has(id) && !pendingChatIds.has(id),
+      );
+
+      if (newChatIds.length > 0) {
+        await prisma.chatMembership.createMany({
+          data: newChatIds.map((chatId) => ({
+            userId: user.id,
+            chatId,
+            status: "PENDING_INVITE" as const,
+          })),
+          skipDuplicates: true,
+        });
+        // triggerOnboarding создаст ссылки и сразу отправит (botStarted=true)
+        await triggerOnboarding(user.id, user.telegramId, true, newChatIds);
+        sentDefaultPackage = true;
+        console.log(`[Bot] Auto-assigned default package (${newChatIds.length} chats) to user ${from.id}`);
+      }
+    }
+
+    // 3. Отправляем отложенные ссылки от ручных назначений администратора
     if (pendingLinks.length > 0) {
       await sendInviteLinksToUser(
         from.id,
         pendingLinks.map((l) => ({ chatTitle: l.chat.title, link: l.link })),
       );
-    } else {
-      // Просто приветствие
+    } else if (!sentDefaultPackage) {
+      // Ни pending-ссылок, ни дефолтного пакета — просто приветствие
       try {
         await telegramBot.sendMessage(
           from.id,

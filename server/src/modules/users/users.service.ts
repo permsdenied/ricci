@@ -13,7 +13,7 @@ import { telegramBot, buildInlineKeyboard, TelegramApiError } from "../../lib/te
 // ──────────────────────────────────────────────────────────────────────────────
 // Onboarding: создать инвайт-ссылки и отправить сотруднику в ЛС
 // ──────────────────────────────────────────────────────────────────────────────
-async function triggerOnboarding(
+export async function triggerOnboarding(
   userId: string,
   userTelegramId: bigint,
   botStarted: boolean,
@@ -402,6 +402,37 @@ class UsersService {
     });
 
     return this.findById(id);
+  }
+
+  async sendPackage(userId: string, packageId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { telegramId: true, botStarted: true },
+    });
+    if (!user) throw AppError.notFound("User not found");
+
+    const packageChats = await prisma.chatPackageItem.findMany({
+      where: { packageId },
+      select: { chatId: true },
+    });
+    if (packageChats.length === 0) {
+      return { message: "Package has no chats" };
+    }
+
+    const chatIds = packageChats.map((pc) => pc.chatId);
+
+    await prisma.chatMembership.createMany({
+      data: chatIds.map((chatId) => ({
+        userId,
+        chatId,
+        status: "PENDING_INVITE" as const,
+      })),
+      skipDuplicates: true,
+    });
+
+    await triggerOnboarding(userId, user.telegramId, user.botStarted, chatIds);
+
+    return { message: user.botStarted ? "Invite links sent" : "Invite links created (will be sent when user starts the bot)" };
   }
 
   async activate(id: string) {

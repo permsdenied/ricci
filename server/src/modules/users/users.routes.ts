@@ -7,6 +7,7 @@ import {
   updateUserSchema,
   assignTagsSchema,
   assignChatsSchema,
+  sendPackageSchema,
 } from "./users.schema";
 
 const router = Router();
@@ -51,6 +52,10 @@ router.delete("/:id/tags", validate(assignTagsSchema), (req, res, next) =>
 
 router.post("/:id/chats", validate(assignChatsSchema), (req, res, next) =>
   usersController.assignChats(req, res, next)
+);
+
+router.post("/:id/send-package", validate(sendPackageSchema), (req, res, next) =>
+  usersController.sendPackage(req, res, next)
 );
 
 router.post("/:id/block", (req, res, next) =>

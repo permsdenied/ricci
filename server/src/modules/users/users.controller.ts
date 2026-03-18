@@ -6,6 +6,7 @@ import {
   AssignTagsDto,
   AssignChatsDto,
   userQuerySchema,
+  SendPackageDto,
 } from "./users.schema";
 
 class UsersController {
@@ -84,6 +85,17 @@ class UsersController {
     try {
       const id = req.params.id as string;
       const result = await usersService.assignChats(id, req.body as AssignChatsDto);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async sendPackage(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = req.params.id as string;
+      const { packageId } = req.body as SendPackageDto;
+      const result = await usersService.sendPackage(id, packageId);
       res.json({ success: true, data: result });
     } catch (error) {
       next(error);

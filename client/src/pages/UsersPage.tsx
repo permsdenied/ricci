@@ -29,7 +29,7 @@ import {
 import { Label } from "@/components/ui/label";
 import api from "@/api/axios";
 import { toast } from "sonner";
-import { Plus, Search, UserX, UserCheck, Edit, Trash2, Download } from "lucide-react";
+import { Plus, Search, UserX, UserCheck, Edit, Trash2, Download, Send } from "lucide-react";
 
 interface Tag {
   id: string;
@@ -89,6 +89,12 @@ function UsersPage() {
     chatPackageId: "",
     tagIds: [] as string[],
   });
+
+  // Отправка инвайтов
+  const [isSendPackageOpen, setIsSendPackageOpen] = useState(false);
+  const [sendPackageUserId, setSendPackageUserId] = useState<string | null>(null);
+  const [sendPackageId, setSendPackageId] = useState("");
+  const [sendPackageSaving, setSendPackageSaving] = useState(false);
 
   // Редактирование
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -250,6 +256,26 @@ function UsersPage() {
       fetchUsers();
     } catch (error: any) {
       toast.error(error.response?.data?.error?.message || "Ошибка удаления");
+    }
+  };
+
+  const handleSendPackageOpen = (userId: string) => {
+    setSendPackageUserId(userId);
+    setSendPackageId(allPackages.find((p) => p.isDefault)?.id || "");
+    setIsSendPackageOpen(true);
+  };
+
+  const handleSendPackage = async () => {
+    if (!sendPackageUserId || !sendPackageId) return;
+    setSendPackageSaving(true);
+    try {
+      const res = await api.post(`/users/${sendPackageUserId}/send-package`, { packageId: sendPackageId });
+      toast.success(res.data.data.message);
+      setIsSendPackageOpen(false);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error?.message || "Ошибка отправки");
+    } finally {
+      setSendPackageSaving(false);
     }
   };
 
@@ -593,6 +619,16 @@ function UsersPage() {
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
+                      {user.status !== "BLOCKED" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Отправить инвайт-ссылки"
+                          onClick={() => handleSendPackageOpen(user.id)}
+                        >
+                          <Send className="h-4 w-4 text-blue-500" />
+                        </Button>
+                      )}
                       {user.status === "BLOCKED" ? (
                         <>
                           <Button
@@ -683,6 +719,45 @@ function UsersPage() {
           )}
         </div>
       )}
+
+      {/* Send invites dialog */}
+      <Dialog open={isSendPackageOpen} onOpenChange={setIsSendPackageOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Отправить инвайт-ссылки</DialogTitle>
+            <DialogDescription>
+              Выберите пакет чатов — бот отправит сотруднику ссылки на все чаты из пакета.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label className="mb-2 block">Пакет чатов</Label>
+            {allPackages.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Нет созданных пакетов</p>
+            ) : (
+              <Select value={sendPackageId} onValueChange={setSendPackageId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Выберите пакет" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allPackages.map((pkg) => (
+                    <SelectItem key={pkg.id} value={pkg.id}>
+                      {pkg.name}{pkg.isDefault ? " ★" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSendPackageOpen(false)} disabled={sendPackageSaving}>
+              Отмена
+            </Button>
+            <Button onClick={handleSendPackage} disabled={sendPackageSaving || !sendPackageId}>
+              {sendPackageSaving ? "Отправка..." : "Отправить"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>

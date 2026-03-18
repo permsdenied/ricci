@@ -39,8 +39,13 @@ export const assignChatsSchema = z.object({
   chatIds: z.array(z.string()).min(1, "At least one chat is required"),
 });
 
+export const sendPackageSchema = z.object({
+  packageId: z.string().min(1),
+});
+
 export type CreateUserDto = z.infer<typeof createUserSchema>;
 export type UpdateUserDto = z.infer<typeof updateUserSchema>;
 export type UserQueryDto = z.infer<typeof userQuerySchema>;
 export type AssignTagsDto = z.infer<typeof assignTagsSchema>;
 export type AssignChatsDto = z.infer<typeof assignChatsSchema>;
+export type SendPackageDto = z.infer<typeof sendPackageSchema>;
