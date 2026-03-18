@@ -581,6 +581,53 @@ function CheckboxList<T extends { id: string; name?: string; title?: string }>({
   );
 }
 
+// ── Recipient row ────────────────────────────────────────────────────────────
+
+function RecipientRow({ r }: { r: BroadcastRecipient }) {
+  const [expanded, setExpanded] = useState(false);
+  const userName = [r.user.firstName, r.user.lastName].filter(Boolean).join(" ")
+    || `ID: ${r.user.telegramId}`;
+
+  return (
+    <div className={`px-3 py-2 ${r.error && expanded ? "bg-destructive/5" : ""}`}>
+      <div className="flex items-center gap-3">
+        {r.error ? (
+          <XCircle className="h-4 w-4 text-destructive shrink-0" />
+        ) : r.sentAt ? (
+          <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+        ) : (
+          <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+        )}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium truncate">{userName}</p>
+          {r.user.username && <p className="text-xs text-muted-foreground">@{r.user.username}</p>}
+        </div>
+        <div className="text-right shrink-0">
+          {r.error ? (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="flex items-center gap-1 text-xs text-destructive hover:underline"
+            >
+              <span>{expanded ? "Скрыть" : "Ошибка"}</span>
+              <ChevronRight className={`h-3 w-3 transition-transform ${expanded ? "rotate-90" : ""}`} />
+            </button>
+          ) : r.sentAt ? (
+            <p className="text-xs text-muted-foreground">{formatDate(r.sentAt)}</p>
+          ) : (
+            <p className="text-xs text-muted-foreground">Ожидает</p>
+          )}
+        </div>
+      </div>
+      {r.error && expanded && (
+        <div className="mt-2 rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2">
+          <p className="text-xs text-destructive font-mono break-all whitespace-pre-wrap">{r.error}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── User picker ──────────────────────────────────────────────────────────────
 
 interface UserOption {
@@ -1167,31 +1214,7 @@ function BroadcastsPage() {
                   ) : (
                     <div className="border rounded-md divide-y max-h-64 overflow-y-auto">
                       {detailBroadcast.recipients.map((r) => (
-                        <div key={r.id} className="flex items-center gap-3 px-3 py-2">
-                          {r.error ? (
-                            <XCircle className="h-4 w-4 text-destructive shrink-0" />
-                          ) : r.sentAt ? (
-                            <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                          ) : (
-                            <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">
-                              {r.user.firstName} {r.user.lastName}
-                              {!r.user.firstName && !r.user.lastName && `ID: ${r.user.telegramId}`}
-                            </p>
-                            {r.user.username && <p className="text-xs text-muted-foreground">@{r.user.username}</p>}
-                          </div>
-                          <div className="text-right shrink-0">
-                            {r.error ? (
-                              <p className="text-xs text-destructive max-w-[140px] truncate" title={r.error}>{r.error}</p>
-                            ) : r.sentAt ? (
-                              <p className="text-xs text-muted-foreground">{formatDate(r.sentAt)}</p>
-                            ) : (
-                              <p className="text-xs text-muted-foreground">Ожидает</p>
-                            )}
-                          </div>
-                        </div>
+                        <RecipientRow key={r.id} r={r} />
                       ))}
                     </div>
                   )}
