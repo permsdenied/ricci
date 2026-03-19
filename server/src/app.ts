@@ -59,7 +59,7 @@ app.use("/api/broadcasts", broadcastsRoutes);
 app.use("/api/integrations", integrationsRoutes);
 app.use("/api/uploads", uploadsRoutes);
 
-// Bot webhook (с отдельной авторизацией)ф
+// Bot webhook (с отдельной авторизацией)фs
 app.use("/api/bot", botAuthMiddleware, telegramRoutes);
 
 // Error handling
