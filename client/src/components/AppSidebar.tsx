@@ -255,20 +255,7 @@ export function AppSidebar() {
                   placeholder="ivan@ricci.ru"
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label>Роль</Label>
-                <Select value={adminForm.role} onValueChange={(v) => setAdminForm((f) => ({ ...f, role: v }))}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ADMIN">Admin</SelectItem>
-                    <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
-                    <SelectItem value="VIEWER">Viewer</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <p className="text-xs text-muted-foreground">Пароль будет сгенерирован автоматически (24 символа)</p>
+<p className="text-xs text-muted-foreground">Пароль будет сгенерирован автоматически (24 символа)</p>
               <DialogFooter>
                 <Button variant="outline" onClick={handleAdminDialogClose}>Отмена</Button>
                 <Button onClick={handleCreateAdmin} disabled={adminLoading}>
