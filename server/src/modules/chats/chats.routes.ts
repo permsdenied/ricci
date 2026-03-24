@@ -28,4 +28,8 @@ router.patch("/:id", validate(updateChatSchema), (req, res, next) =>
   chatsController.update(req, res, next)
 );
 
+router.delete("/:id", (req, res, next) =>
+  chatsController.delete(req, res, next)
+);
+
 export default router;

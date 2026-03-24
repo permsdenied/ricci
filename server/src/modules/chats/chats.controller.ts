@@ -33,10 +33,20 @@ class ChatsController {
     }
   }
 
-  async getStats(req: Request, res: Response, next: NextFunction) {
+  async getStats(_req: Request, res: Response, next: NextFunction) {
     try {
       const result = await chatsService.getStats();
       res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async delete(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = req.params.id as string;
+      await chatsService.delete(id);
+      res.json({ success: true });
     } catch (error) {
       next(error);
     }

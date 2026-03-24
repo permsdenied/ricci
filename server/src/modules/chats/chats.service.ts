@@ -132,6 +132,10 @@ class ChatsService {
     return this.serializeChat(chat);
   }
 
+  async delete(id: string) {
+    await prisma.chat.delete({ where: { id } });
+  }
+
   async getStats() {
     const [total, groups, supergroups, channels, withIssues] = await Promise.all([
       prisma.chat.count({ where: { isActive: true } }),
