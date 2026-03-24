@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import prisma from "../../db/client";
 import { config } from "../../config";
 import { AppError } from "../../common/errors/app-error";
@@ -53,7 +54,8 @@ class AuthService {
       throw AppError.conflict("Email already registered", "EMAIL_EXISTS");
     }
 
-    const hashedPassword = await bcrypt.hash(dto.password, 12);
+    const plainPassword = dto.password ?? this.generatePassword();
+    const hashedPassword = await bcrypt.hash(plainPassword, 12);
 
     const admin = await prisma.admin.create({
       data: {
@@ -71,13 +73,10 @@ class AuthService {
       },
     });
 
-    const token = this.generateToken({
-      adminId: admin.id,
-      email: admin.email,
-      role: admin.role,
-    });
+    // Возвращаем пароль только если он был сгенерирован (не передан клиентом)
+    const generatedPassword = dto.password ? undefined : plainPassword;
 
-    return { token, admin };
+    return { admin, generatedPassword };
   }
 
   async changePassword(adminId: string, dto: ChangePasswordDto) {
@@ -133,7 +132,12 @@ class AuthService {
     });
   }
 
-
+  private generatePassword(): string {
+    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+    return Array.from(crypto.randomBytes(24))
+      .map((b) => chars[b % chars.length])
+      .join("");
+  }
 }
 
 export const authService = new AuthService();

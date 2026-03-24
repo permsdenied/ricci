@@ -10,6 +10,9 @@ import {
   LogOut,
   Bot,
   KeyRound,
+  UserPlus,
+  Copy,
+  Check,
 } from "lucide-react";
 import {
   Sidebar,
@@ -33,6 +36,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/api/axios";
 import { toast } from "sonner";
@@ -45,6 +49,12 @@ export function AppSidebar() {
   const [pwOpen, setPwOpen] = useState(false);
   const [pwForm, setPwForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [pwLoading, setPwLoading] = useState(false);
+
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [adminForm, setAdminForm] = useState({ email: "", name: "", role: "ADMIN" });
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [createdPassword, setCreatedPassword] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const navItems = [
     { title: "Дашборд", url: "/dashboard", icon: LayoutDashboard },
@@ -83,6 +93,42 @@ export function AppSidebar() {
     } finally {
       setPwLoading(false);
     }
+  };
+
+  const handleCreateAdmin = async () => {
+    if (!adminForm.email || !adminForm.name) {
+      toast.error("Заполните все поля");
+      return;
+    }
+    setAdminLoading(true);
+    try {
+      const res = await api.post("/auth/register", adminForm);
+      const { generatedPassword } = res.data.data;
+      if (generatedPassword) {
+        setCreatedPassword(generatedPassword);
+      } else {
+        toast.success("Администратор создан");
+        setAdminOpen(false);
+        setAdminForm({ email: "", name: "", role: "ADMIN" });
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? "Ошибка создания");
+    } finally {
+      setAdminLoading(false);
+    }
+  };
+
+  const handleCopyPassword = () => {
+    if (!createdPassword) return;
+    navigator.clipboard.writeText(createdPassword);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleAdminDialogClose = () => {
+    setAdminOpen(false);
+    setCreatedPassword(null);
+    setAdminForm({ email: "", name: "", role: "ADMIN" });
   };
 
   return (
@@ -137,6 +183,15 @@ export function AppSidebar() {
               <p className="text-xs text-muted-foreground">{admin?.email}</p>
             </div>
             <div className="flex items-center gap-1">
+              {admin?.role === "SUPER_ADMIN" && (
+                <SidebarMenuButton
+                  onClick={() => setAdminOpen(true)}
+                  className="p-2 cursor-pointer"
+                  title="Создать администратора"
+                >
+                  <UserPlus className="h-4 w-4" />
+                </SidebarMenuButton>
+              )}
               <SidebarMenuButton
                 onClick={() => setPwOpen(true)}
                 className="p-2 cursor-pointer"
@@ -155,6 +210,71 @@ export function AppSidebar() {
           </div>
         </SidebarFooter>
       </Sidebar>
+
+      <Dialog open={adminOpen} onOpenChange={handleAdminDialogClose}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Создать администратора</DialogTitle>
+          </DialogHeader>
+
+          {createdPassword ? (
+            <div className="space-y-4 py-2">
+              <p className="text-sm text-muted-foreground">
+                Администратор создан. Сохраните пароль — он больше не будет показан.
+              </p>
+              <div className="flex items-center gap-2 rounded-md border bg-muted px-3 py-2">
+                <code className="flex-1 text-sm font-mono break-all">{createdPassword}</code>
+                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={handleCopyPassword}>
+                  {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                </Button>
+              </div>
+              <DialogFooter>
+                <Button onClick={handleAdminDialogClose}>Готово</Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-4 py-2">
+              <div className="space-y-1.5">
+                <Label>Имя</Label>
+                <Input
+                  value={adminForm.name}
+                  onChange={(e) => setAdminForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="Иван Иванов"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={adminForm.email}
+                  onChange={(e) => setAdminForm((f) => ({ ...f, email: e.target.value }))}
+                  placeholder="ivan@ricci.ru"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Роль</Label>
+                <Select value={adminForm.role} onValueChange={(v) => setAdminForm((f) => ({ ...f, role: v }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ADMIN">Admin</SelectItem>
+                    <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
+                    <SelectItem value="VIEWER">Viewer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs text-muted-foreground">Пароль будет сгенерирован автоматически (24 символа)</p>
+              <DialogFooter>
+                <Button variant="outline" onClick={handleAdminDialogClose}>Отмена</Button>
+                <Button onClick={handleCreateAdmin} disabled={adminLoading}>
+                  {adminLoading ? "Создание..." : "Создать"}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={pwOpen} onOpenChange={setPwOpen}>
         <DialogContent className="sm:max-w-sm">
