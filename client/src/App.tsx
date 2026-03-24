@@ -10,6 +10,7 @@ import TagsPage from "@/pages/TagsPage";
 import ChatsPage from "@/pages/ChatsPage";
 import ChatPackagesPage from "@/pages/ChatPackagesPage";
 import BroadcastsPage from "@/pages/BroadcastsPage";
+import AdminsPage from "@/pages/AdminsPage";
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/chats" element={<ProtectedRoute><Layout><ChatsPage /></Layout></ProtectedRoute>} />
           <Route path="/chat-packages" element={<ProtectedRoute><Layout><ChatPackagesPage /></Layout></ProtectedRoute>} />
           <Route path="/broadcasts" element={<ProtectedRoute><Layout><BroadcastsPage /></Layout></ProtectedRoute>} />
+          <Route path="/admins" element={<ProtectedRoute><Layout><AdminsPage /></Layout></ProtectedRoute>} />
           <Route path="*" element={<div className="flex items-center justify-center h-screen"><div className="text-center"><h1 className="text-4xl font-bold">404</h1><p className="text-muted-foreground mt-2">Страница не найдена</p></div></div>} />
         </Routes>
       </Router>

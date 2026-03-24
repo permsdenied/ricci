@@ -107,6 +107,20 @@ class AuthService {
     return { message: "Password changed successfully" };
   }
 
+  async listAdmins() {
+    return prisma.admin.findMany({
+      select: { id: true, email: true, name: true, role: true, isActive: true, createdAt: true },
+      orderBy: { createdAt: "asc" },
+    });
+  }
+
+  async deleteAdmin(adminId: string, requesterId: string) {
+    if (adminId === requesterId) {
+      throw AppError.badRequest("Cannot delete your own account");
+    }
+    await prisma.admin.delete({ where: { id: adminId } });
+  }
+
   async getProfile(adminId: string) {
     const admin = await prisma.admin.findUnique({
       where: { id: adminId },

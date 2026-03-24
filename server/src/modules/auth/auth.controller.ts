@@ -33,6 +33,24 @@ class AuthController {
     }
   }
 
+  async listAdmins(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await authService.listAdmins();
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteAdmin(req: Request, res: Response, next: NextFunction) {
+    try {
+      await authService.deleteAdmin(req.params.id as string, req.admin!.adminId);
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getProfile(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await authService.getProfile(req.admin!.adminId);

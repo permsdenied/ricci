@@ -35,4 +35,18 @@ router.post(
   (req, res, next) => authController.changePassword(req, res, next)
 );
 
+router.get(
+  "/admins",
+  authMiddleware,
+  requireRole("SUPER_ADMIN"),
+  (req, res, next) => authController.listAdmins(req, res, next)
+);
+
+router.delete(
+  "/admins/:id",
+  authMiddleware,
+  requireRole("SUPER_ADMIN"),
+  (req, res, next) => authController.deleteAdmin(req, res, next)
+);
+
 export default router;

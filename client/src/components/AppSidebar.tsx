@@ -13,6 +13,7 @@ import {
   UserPlus,
   Copy,
   Check,
+  ShieldCheck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -63,6 +64,9 @@ export function AppSidebar() {
     { title: "Чаты", url: "/chats", icon: MessageSquare },
     { title: "Пакеты чатов", url: "/chat-packages", icon: Package },
     { title: "Рассылки", url: "/broadcasts", icon: Send },
+    ...(admin?.role === "SUPER_ADMIN"
+      ? [{ title: "Администраторы", url: "/admins", icon: ShieldCheck }]
+      : []),
   ];
 
   const handleLogout = () => {
