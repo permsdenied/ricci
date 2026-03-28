@@ -1111,12 +1111,29 @@ function BroadcastsPage() {
               <Button variant="outline" onClick={() => setIsCreateOpen(false)} disabled={submitting}>
                 Отмена
               </Button>
-              <Button variant="secondary" onClick={handleSaveDraft} disabled={submitting || !form.content.trim()}>
-                Черновик
-              </Button>
-              <Button onClick={handlePrimarySubmit} disabled={submitting || !form.content.trim()}>
-                {isScheduledForFuture ? "Сохранить" : <><Send className="h-4 w-4 mr-2" />Отправить</>}
-              </Button>
+              {editingId ? (
+                <>
+                  <Button variant="secondary" onClick={handleSaveDraft} disabled={submitting || !form.content.trim()}>
+                    Черновик
+                  </Button>
+                  <Button variant="outline" onClick={handleSendNow} disabled={submitting || !form.content.trim()}>
+                    <Send className="h-4 w-4 mr-2" />
+                    Отправить
+                  </Button>
+                  <Button onClick={isScheduledForFuture ? handleSaveScheduled : handleSaveDraft} disabled={submitting || !form.content.trim()}>
+                    Сохранить
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button variant="secondary" onClick={handleSaveDraft} disabled={submitting || !form.content.trim()}>
+                    Черновик
+                  </Button>
+                  <Button onClick={handlePrimarySubmit} disabled={submitting || !form.content.trim()}>
+                    {isScheduledForFuture ? "Сохранить" : <><Send className="h-4 w-4 mr-2" />Отправить</>}
+                  </Button>
+                </>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>
