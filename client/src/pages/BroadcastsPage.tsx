@@ -45,6 +45,7 @@ import {
   Link,
   Search,
   UserCheck,
+  Pencil,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -734,6 +735,7 @@ function BroadcastsPage() {
   const [total, setTotal] = useState(0);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<"edit" | "preview">("edit");
@@ -775,7 +777,32 @@ function BroadcastsPage() {
   useEffect(() => { fetchBroadcasts(1, statusFilter); setPage(1); }, [statusFilter]);
   useEffect(() => { fetchBroadcasts(page, statusFilter); }, [page]);
 
-  const onOpenCreate = () => { fetchRefData(); setForm(EMPTY_FORM); setActiveTab("edit"); setIsCreateOpen(true); };
+  const onOpenCreate = () => { fetchRefData(); setForm(EMPTY_FORM); setActiveTab("edit"); setEditingId(null); setIsCreateOpen(true); };
+
+  const onOpenEdit = async (b: Broadcast) => {
+    fetchRefData();
+    setActiveTab("edit");
+    setEditingId(b.id);
+    try {
+      const res = await api.get(`/broadcasts/${b.id}`);
+      const detail = res.data.data;
+      setForm({
+        title: detail.title ?? "",
+        content: detail.content,
+        mediaItems: detail.mediaItems ?? [],
+        buttons: detail.buttons ?? [],
+        targetType: detail.targetType,
+        tagIds: detail.targetTags.map((t: any) => t.id),
+        chatIds: detail.targetChats.map((c: any) => c.id),
+        userIds: (detail.targetUsers ?? []).map((u: any) => u.id),
+        scheduledAt: detail.scheduledAt ? new Date(detail.scheduledAt).toISOString().slice(0, 16) : "",
+      });
+      setIsCreateOpen(true);
+    } catch {
+      toast.error("Ошибка загрузки рассылки");
+      setEditingId(null);
+    }
+  };
 
   // ── Form ───────────────────────────────────────────────────────────────────
 
@@ -804,9 +831,36 @@ function BroadcastsPage() {
     if (!form.content.trim()) { toast.error("Введите текст сообщения"); return; }
     setSubmitting(true);
     try {
-      await api.post("/broadcasts", buildPayload(false));
-      toast.success("Черновик сохранён");
+      const payload = { ...buildPayload(false), scheduledAt: editingId ? null : undefined };
+      if (editingId) {
+        await api.put(`/broadcasts/${editingId}`, payload);
+      } else {
+        await api.post("/broadcasts", payload);
+      }
+      toast.success(editingId ? "Черновик обновлён" : "Черновик сохранён");
       setIsCreateOpen(false);
+      setEditingId(null);
+      fetchBroadcasts(1, statusFilter);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error?.message || "Ошибка сохранения");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSaveScheduled = async () => {
+    if (!form.content.trim()) { toast.error("Введите текст сообщения"); return; }
+    setSubmitting(true);
+    try {
+      const payload = buildPayload(false);
+      if (editingId) {
+        await api.put(`/broadcasts/${editingId}`, payload);
+      } else {
+        await api.post("/broadcasts", payload);
+      }
+      toast.success(editingId ? "Рассылка обновлена" : "Рассылка запланирована");
+      setIsCreateOpen(false);
+      setEditingId(null);
       fetchBroadcasts(1, statusFilter);
     } catch (err: any) {
       toast.error(err.response?.data?.error?.message || "Ошибка сохранения");
@@ -819,10 +873,17 @@ function BroadcastsPage() {
     if (!form.content.trim()) { toast.error("Введите текст сообщения"); return; }
     setSubmitting(true);
     try {
-      const createRes = await api.post("/broadcasts", buildPayload(true));
-      await api.post(`/broadcasts/${createRes.data.data.id}/send`);
+      let id = editingId;
+      if (editingId) {
+        await api.put(`/broadcasts/${editingId}`, buildPayload(true));
+      } else {
+        const createRes = await api.post("/broadcasts", buildPayload(true));
+        id = createRes.data.data.id;
+      }
+      await api.post(`/broadcasts/${id}/send`);
       toast.success("Рассылка запущена");
       setIsCreateOpen(false);
+      setEditingId(null);
       fetchBroadcasts(1, statusFilter);
     } catch (err: any) {
       toast.error(err.response?.data?.error?.message || "Ошибка отправки");
@@ -831,7 +892,7 @@ function BroadcastsPage() {
     }
   };
 
-  const handlePrimarySubmit = () => isScheduledForFuture ? handleSaveDraft() : handleSendNow();
+  const handlePrimarySubmit = () => isScheduledForFuture ? handleSaveScheduled() : handleSendNow();
 
   // ── Row actions ─────────────────────────────────────────────────────────────
 
@@ -892,7 +953,7 @@ function BroadcastsPage() {
           <p className="text-muted-foreground text-sm mt-1">Всего: {total}</p>
         </div>
 
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <Dialog open={isCreateOpen} onOpenChange={(v) => { setIsCreateOpen(v); if (!v) setEditingId(null); }}>
           <DialogTrigger asChild>
             <Button onClick={onOpenCreate}>
               <Plus className="mr-2 h-4 w-4" />
@@ -902,7 +963,7 @@ function BroadcastsPage() {
 
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Новая рассылка</DialogTitle>
+              <DialogTitle>{editingId ? "Редактировать рассылку" : "Новая рассылка"}</DialogTitle>
             </DialogHeader>
 
             <div className="space-y-5 py-2">
@@ -1132,6 +1193,11 @@ function BroadcastsPage() {
                     <Button size="sm" className="flex-1" onClick={() => handleSend(b.id)}>
                       <Send className="h-3.5 w-3.5 mr-1.5" />
                       Отправить
+                    </Button>
+                  )}
+                  {(b.status === "DRAFT" || b.status === "SCHEDULED") && (
+                    <Button size="sm" variant="outline" onClick={() => onOpenEdit(b)}>
+                      <Pencil className="h-3.5 w-3.5" />
                     </Button>
                   )}
                   <Button size="sm" variant="outline" onClick={() => handleOpenDetail(b.id)}>
