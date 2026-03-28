@@ -833,7 +833,7 @@ function BroadcastsPage() {
     try {
       const payload = { ...buildPayload(false), scheduledAt: editingId ? null : undefined };
       if (editingId) {
-        await api.put(`/broadcasts/${editingId}`, payload);
+        await api.patch(`/broadcasts/${editingId}`, payload);
       } else {
         await api.post("/broadcasts", payload);
       }
@@ -854,7 +854,7 @@ function BroadcastsPage() {
     try {
       const payload = buildPayload(false);
       if (editingId) {
-        await api.put(`/broadcasts/${editingId}`, payload);
+        await api.patch(`/broadcasts/${editingId}`, payload);
       } else {
         await api.post("/broadcasts", payload);
       }
@@ -875,7 +875,7 @@ function BroadcastsPage() {
     try {
       let id = editingId;
       if (editingId) {
-        await api.put(`/broadcasts/${editingId}`, buildPayload(true));
+        await api.patch(`/broadcasts/${editingId}`, buildPayload(true));
       } else {
         const createRes = await api.post("/broadcasts", buildPayload(true));
         id = createRes.data.data.id;
