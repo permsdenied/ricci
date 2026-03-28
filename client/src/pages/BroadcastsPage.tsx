@@ -254,7 +254,7 @@ function MDEditorWithUpload({
   );
 
   return (
-    <div ref={editorRef} className="relative" onPaste={onPaste} onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
+    <div ref={editorRef} className="relative" data-color-mode="light" onPaste={onPaste} onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
       <MDEditor
         value={value}
         onChange={(v) => onChange(v ?? "")}
